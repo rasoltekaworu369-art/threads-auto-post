@@ -18,6 +18,8 @@ P="posted/${TARGET}.json"
 Q="queue/${TARGET}.json"
 
 # 旧形式(media_id 単体)と新形式(media_ids 配列)の両方を扱う。
+# 🔴 jq は日本語のフィールド名を .テーマ の形で読めない。必ず .["テーマ"] と書く。
+#    2026-10-19 の初回実行がこれで失敗した（jq: try .["field"] instead of .field）。
 # 🔴 time 列には「予定の枠」ではなく【実際に投稿した時刻】を入れる。
 #    GitHub の定時実行は25分前後遅れるため、予定の枠では時間帯分析が成立しない。
 jq -r '.posted[] | select(.status=="published")
@@ -32,7 +34,7 @@ while read -r IDX POS MID AT; do
     --data-urlencode "metric=views,likes,replies,reposts,quotes")
   get() { printf '%s' "$M" | jq -r --arg n "$1" '(.data[]? | select(.name==$n) | (.values[0].value // .total_value.value)) // 0'; }
   if [ -f "$Q" ]; then
-    meta=$(jq -r --argjson i "$IDX" '.posts[$i] | "\(.テーマ // "")|\(.構成型 // "")|\(.開幕型 // "")|\(.締め型 // "")|\(.slot // "")"' "$Q")
+    meta=$(jq -r --argjson i "$IDX" '.posts[$i] | "\(.["テーマ"] // "")|\(.["構成型"] // "")|\(.["開幕型"] // "")|\(.["締め型"] // "")|\(.slot // "")"' "$Q")
   else meta="||||"; fi
   IFS='|' read -r THEME KOU KAI SHIME SLOT <<< "$meta"
   # セルフリプの行には型を書かない（型は1ツリーに1つなので、親の行だけが持つ）
