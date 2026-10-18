@@ -44,8 +44,8 @@
 concept.md              売る商品と売れるコンセプト。🔑 自動化の精度はこのファイルの精度で決まる
 improve.md              Routine C が毎朝上書き / Routine A が毎晩読む。人間は書き込まない
 reaction-log.csv        反応の記録。追記のみ。これが唯一の履歴
-queue/YYYY-MM-DD.json   その日に投稿する9本
-posted/YYYY-MM-DD.json  実際に公開した media_id の記録
+queue/YYYY-MM-DD.json   その日に投稿する9ツリー(posts[].tree = 親1文 + セルフリプ3〜5本)
+posted/YYYY-MM-DD.json  公開した media_id の記録(root_media_id と media_ids 配列)
 参照/                   ボスの資産の抽出版（下記）
 scripts/                post_next.sh / fetch_insights.sh / refresh_token.sh
 運用/                   Routine A と C に貼るプロンプト、セットアップ手順
@@ -77,6 +77,11 @@ scripts/                post_next.sh / fetch_insights.sh / refresh_token.sh
 
 ## 4. Threads 投稿の形式ルール
 
+- 🔴 **全件ツリー型。単発投稿は禁止**（2026-10-18 ボス指示。単発では反応が出なかった）
+- 🔴 **親投稿は「1文のみ」で独立させる。** その1文に毎回違う2〜3個を組み合わせる:
+  緊急性 / アンマッチ / 恐怖 / アンチテーゼ / 即叶う / 激変 / 希少性 / 私しか言っていない事
+- **セルフリプは3〜5本。** 各140〜250字。スクリプトが前の投稿に返信する形で自動で繋ぐ
+- 導線は **9ツリー中2つまで**、しかも**最後のセルフリプに置く**。親には入れない
 - 1本 **140〜250字**
 - **省略ぐせを止める。** 話し言葉でつなぐ。体言止めを並べない
 - **「あなた」一人に向けて書く。** 三人称に逃げない
