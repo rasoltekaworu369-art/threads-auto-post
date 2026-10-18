@@ -1,0 +1,40 @@
+# 🔴 このリポジトリは必ず GitHub の「プライベート」で作る。
+#    参照/ にボスの文体指紋(文体憲章の抽出版)と実投稿のお手本が入っている。
+#
+# 🔴 秘密は1つも置かない。
+#    Threads の長期トークン / Meta アプリの App Secret は
+#    GitHub Secrets と クラウド環境の Network secrets で渡す。
+
+.env
+.env.*
+*.env
+*secret*
+*token*
+*credential*
+*.key
+*.pem
+
+# マシンローカル設定
+.claude/settings.local.json
+
+# OS・エディタ
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# 作業の残骸
+*.bak
+*.tmp
+*.orig
+~$*
+
+# ---------------------------------------------------------------
+# 上の *token* / *secret* パターンが、自分のスクリプトまで
+# 除外してしまうための除外解除。この2行を消すとワークフローが消える。
+# ---------------------------------------------------------------
+!scripts/refresh_token.sh
+!.github/workflows/refresh-token.yml

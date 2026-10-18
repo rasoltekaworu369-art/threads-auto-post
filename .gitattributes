@@ -1,0 +1,8 @@
+# 🔴 これが無いと Windows の CRLF がそのまま入り、
+#    GitHub Actions(Ubuntu)で bash スクリプトが "bad interpreter" で落ちる。
+* text=auto eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.md text eol=lf
