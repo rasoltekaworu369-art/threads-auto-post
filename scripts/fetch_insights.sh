@@ -2,7 +2,10 @@
 # 24時間以上経った投稿の insights を取得し reaction-log.csv に追記する。
 set -euo pipefail
 : "${THREADS_USER_ID:?}" "${THREADS_ACCESS_TOKEN:?}"
-API="https://graph.threads.net/v1.0"
+# 公式ドキュメントは graph.threads.com へ移行中。graph.threads.net も現時点では同じ応答を返す。
+# 片方が落ちたら THREADS_HOST を切り替えるだけで直るようにしてある。
+HOST="${THREADS_HOST:-graph.threads.com}"
+API="https://${HOST}/v1.0"
 AUTH="Authorization: Bearer ${THREADS_ACCESS_TOKEN}"
 TARGET="${1:-$(TZ=Asia/Tokyo date -d yesterday +%F)}"
 P="posted/${TARGET}.json"

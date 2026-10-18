@@ -97,7 +97,7 @@ scripts/                post_next.sh / fetch_insights.sh / refresh_token.sh
 | 使う場所 | 渡し方 |
 |---|---|
 | GitHub Actions | リポジトリの Secrets：`THREADS_USER_ID` / `THREADS_ACCESS_TOKEN` / `GH_PAT_FOR_SECRETS` |
-| Routine（Claude のクラウド） | 環境の **Network secrets**（`graph.threads.net` に Bearer で注入。VM 内に鍵が残らない） |
+| Routine（Claude のクラウド） | 環境の **Network secrets**（`graph.threads.com` と `graph.threads.net` の両方に Bearer で注入。VM 内に鍵が残らない） |
 
 🔴 **Threads の長期トークンは60日で恒久的に失効する。** 更新しないまま60日経つと OAuth からやり直しになる。
 `.github/workflows/refresh-token.yml` が毎週日曜に更新する。**このワークフローを止めてはいけない。**

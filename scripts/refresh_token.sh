@@ -3,7 +3,7 @@
 # 新しいトークンは標準出力に出さない。GitHub Secret への反映は gh CLI 経由で行う。
 set -euo pipefail
 : "${THREADS_ACCESS_TOKEN:?}"
-RES=$(curl -sS -G "https://graph.threads.net/refresh_access_token" \
+RES=$(curl -sS -G "https://${THREADS_HOST:-graph.threads.com}/refresh_access_token" \
   --data-urlencode "grant_type=th_refresh_token" \
   --data-urlencode "access_token=${THREADS_ACCESS_TOKEN}")
 NEW=$(printf '%s' "$RES" | jq -r '.access_token // empty')

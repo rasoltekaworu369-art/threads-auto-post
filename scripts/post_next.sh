@@ -5,7 +5,10 @@ set -euo pipefail
 : "${THREADS_USER_ID:?THREADS_USER_ID が未設定}"
 : "${THREADS_ACCESS_TOKEN:?THREADS_ACCESS_TOKEN が未設定}"
 
-API="https://graph.threads.net/v1.0"
+# 公式ドキュメントは graph.threads.com へ移行中。graph.threads.net も現時点では同じ応答を返す。
+# 片方が落ちたら THREADS_HOST を切り替えるだけで直るようにしてある。
+HOST="${THREADS_HOST:-graph.threads.com}"
+API="https://${HOST}/v1.0"
 AUTH="Authorization: Bearer ${THREADS_ACCESS_TOKEN}"
 TODAY="$(TZ=Asia/Tokyo date +%F)"
 Q="queue/${TODAY}.json"
