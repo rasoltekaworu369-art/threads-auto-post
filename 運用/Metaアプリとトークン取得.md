@@ -155,14 +155,19 @@ curl -s "https://graph.threads.com/oauth/access_token" --data-urlencode "client_
 ```
 
 📌 **`code: 101` の `Invalid client_secret` でメッセージに山カッコが見えていたら、原因はこれ。**
-📌 **この失敗では認可コードは消費されない**（client_secret の検証で止まるため）。同じコードでそのまま再実行できる。
+🔴 **訂正（2026-10-18 実測）：この失敗でも認可コードは消費される。**
+当初「client_secret の検証で止まるから消費されない」と書いたが**誤りだった。** 実際には1回目の失敗で消費され、
+2回目は `used_authorization_code` で弾かれた。
+→ 📌 **client_secret を間違えた場合も、認可URLから新しいコードを取り直す。**
+→ 📌 **つまり「1回で通す」準備をしてから実行する。** `curl.exe` と山カッコ外しを先に確認しておくこと。
 
 **うまくいかないとき：**
 
 | エラー | 原因 |
 |---|---|
 | `36008` / redirect_uri mismatch | 登録URLと1文字でも違う。`https://localhost/` の末尾スラッシュを確認 |
-| code already used | コードは使い捨て。2-D からやり直す |
+| `used_authorization_code`（code 100 / subcode 4279030）| 🔴 **コードは1回使ったら死ぬ。** 失敗した試行でも消費される。2-D で新しいコードを取る |
+| code already used | 同上 |
 | 400 / invalid code | 1時間を超えた。2-D からやり直す |
 | 権限が付いていない | 2-C のテスター承諾を忘れている |
 
