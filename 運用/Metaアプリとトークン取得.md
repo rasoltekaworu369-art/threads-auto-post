@@ -132,6 +132,31 @@ curl -s "https://graph.threads.com/oauth/access_token" --data-urlencode "client_
 - `access_token` → **短期トークン**。1時間以内に次のSTEPで交換する
 - `user_id` → **Threads ユーザーID**。`THREADS_USER_ID` に入れる値（秘密ではない）
 
+### 🔴 実際に踏んだ罠2つ（2026-10-18 実測）
+
+**罠1：`curl` ではなく `curl.exe` と書く**
+
+このターミナルは PowerShell で、**`curl` は別コマンド（Invoke-WebRequest）の別名**になっている。
+`--data-urlencode` を受け付けずエラーになる。**必ず `curl.exe` と書く**（Windows 11 に標準で入っている）。
+
+**罠2：`<` と `>` を外す**
+
+プレースホルダの山カッコを付けたまま貼ると、山カッコごと送信される。
+
+```
+❌ --data-urlencode "client_secret=<実際の値>"
+✅ --data-urlencode "client_secret=実際の値"
+```
+
+このとき返るエラー：
+
+```json
+{"error":{"message":"Invalid client_secret: <...>","type":"OAuthException","code":101}}
+```
+
+📌 **`code: 101` の `Invalid client_secret` でメッセージに山カッコが見えていたら、原因はこれ。**
+📌 **この失敗では認可コードは消費されない**（client_secret の検証で止まるため）。同じコードでそのまま再実行できる。
+
 **うまくいかないとき：**
 
 | エラー | 原因 |
@@ -140,6 +165,36 @@ curl -s "https://graph.threads.com/oauth/access_token" --data-urlencode "client_
 | code already used | コードは使い捨て。2-D からやり直す |
 | 400 / invalid code | 1時間を超えた。2-D からやり直す |
 | 権限が付いていない | 2-C のテスター承諾を忘れている |
+
+## STEP 2-F.5｜🔴 App Secret のローテーション（露出させてしまった場合）
+
+App Secret は**初回のトークン交換にしか使わない。**
+`refresh_access_token`（60日ごとの更新）は `access_token` だけで動くので、**日常運用に App Secret は不要。**
+→ **だからローテーション（作り直し）は安く済む。**
+
+### 手順
+
+1. まず STEP 2-F まで終わらせて、**長期トークンが動くことを確認する**（STEP 2-G）
+2. Meta ダッシュボード → アプリ設定 → ベーシック → **Threads App Secret を「リセット」**
+3. リセット後、STEP 2-G をもう一度実行して**長期トークンがまだ生きているか確認する**
+4. 死んでいたら STEP 2-D から認可をやり直す（新しい Secret で 2-E・2-F を通す）
+
+> ⚠️ **App Secret のリセットが既存のユーザートークンを無効化するかは、公式ドキュメントで確認できなかった。**
+> 「アプリに紐づく有効なトークンを全部無効化する」という第三者情報があるが**未確認。**
+> だから手順3で**必ず確認する。** 確信度50%なので、どちらに転んでも進める手順にしてある。
+
+### 露出のリスク評価
+
+| | |
+|---|---|
+| 露出先 | ボス自身の Claude セッションの記録のみ（公開されていない） |
+| App Secret 単体でできること | Threads への投稿は**できない**（ユーザートークンが別途必要） |
+| リスク | **低い。確信度85%** |
+| 反証条件 | セッションの記録が外部に共有・エクスポートされている場合は上がる |
+
+**それでもローテーションは推奨。** 上の通り日常運用に影響しないので、やらない理由がない。
+
+---
 
 ## STEP 2-F｜短期トークン → 長期トークン（60日）
 
