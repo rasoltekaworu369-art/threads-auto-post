@@ -6,9 +6,38 @@
 #   posts[i].text = 旧形式（単発）。tree が無いときのフォールバック
 #
 # 遅延や取りこぼしに強い設計：時刻ではなく posted/ の件数で次を決める。
+#
+# 🔴 時刻の設計（2026-10-19 ボス指示「毎回07分なのが気になる。00〜30分のランダムな時刻にしてくれ」）
+#   【実測】GitHub の定時実行は +25〜26分 遅れていた（13:07予定→13:33実行 / 11:07予定→11:31実行）。
+#   つまり分を正確に指定することはできない。そこで設計をこう変えた：
+#     ① cron を25分前倒しして、遅れを吸収した結果が JST の 00〜30分 に入るようにする
+#     ② 1枠につき3回発火させて、遅れが小さい日の取りこぼしを防ぐ
+#     ③ このスクリプトが「時刻の門」を持ち、00〜30分の外では投稿しない
+#     ④ 同じ枠で二重投稿しないガードを持つ（3回発火するので必須）
+#   結果、投稿される分は GitHub 側のばらつきで毎回変わる＝狙いどおり機械的に見えなくなる。
 set -euo pipefail
 : "${THREADS_USER_ID:?THREADS_USER_ID が未設定}"
 : "${THREADS_ACCESS_TOKEN:?THREADS_ACCESS_TOKEN が未設定}"
+
+# ----- 時刻の門 -----------------------------------------------------------
+JST_H="$(TZ=Asia/Tokyo date +%H)"
+JST_M="$(TZ=Asia/Tokyo date +%M)"
+SLOT_HOURS="06 08 10 12 14 16 18 20 22"
+
+if [ -n "${FORCE_POST:-}" ]; then
+  echo "FORCE_POST が指定された（手動実行）。時刻の門と二重投稿ガードを飛ばす"
+else
+  case " $SLOT_HOURS " in
+    *" $JST_H "*) ;;
+    *) echo "投稿の時間帯ではない（JST ${JST_H}:${JST_M}）。何もしない"; exit 0 ;;
+  esac
+
+  if [ "$((10#$JST_M))" -gt 30 ]; then
+    echo "枠の30分を過ぎている（JST ${JST_H}:${JST_M}）。この枠は見送る"
+    exit 0
+  fi
+  echo "投稿できる時刻（JST ${JST_H}:${JST_M}・枠は ${JST_H}:00〜${JST_H}:30）"
+fi
 
 # 公式ドキュメントは graph.threads.com へ移行中。graph.threads.net も現時点では同じ応答を返す。
 # 片方が落ちたら THREADS_HOST を切り替えるだけで直るようにしてある。
@@ -29,6 +58,13 @@ DONE=$(jq '.posted | length' "$P")
 TOTAL=$(jq '.posts | length' "$Q")
 if [ "$DONE" -ge "$TOTAL" ]; then
   echo "本日分は投稿済み (${DONE}/${TOTAL})"
+  exit 0
+fi
+
+# ----- 二重投稿ガード -----------------------------------------------------
+# 1枠で3回発火するので、この枠で既に投稿していたら何もしない。
+if [ -z "${FORCE_POST:-}" ] && jq -e --arg h "$JST_H" '.posted[] | select(.slot_hour == $h)' "$P" >/dev/null 2>&1; then
+  echo "この枠（JST ${JST_H}時台）は既に投稿済み。二重投稿を防ぐため何もしない"
   exit 0
 fi
 
@@ -53,7 +89,8 @@ decode() { printf '%s' "$1" | base64 -d; }
 FIRST="$(decode "${PARTS[0]}")"
 if [ "$(printf '%s' "$FIRST" | tr -d '[:space:]')" = "SKIP" ]; then
   echo "SKIP 指定。投稿せず記録だけ進める"
-  jq --argjson i "$DONE" '.posted += [{"index":$i,"status":"skipped"}]' "$P" > "$P.tmp" && mv "$P.tmp" "$P"
+  jq --argjson i "$DONE" --arg h "$JST_H" \
+    '.posted += [{"index":$i,"slot_hour":$h,"status":"skipped"}]' "$P" > "$P.tmp" && mv "$P.tmp" "$P"
   exit 0
 fi
 
@@ -120,7 +157,8 @@ IDS_JSON=$(printf '%s\n' "${IDS[@]}" | jq -R . | jq -cs .)
 jq --argjson i "$DONE" \
    --argjson ids "$IDS_JSON" \
    --arg at "$(TZ=Asia/Tokyo date +'%F %T')" \
-   '.posted += [{"index":$i,"root_media_id":($ids[0]),"media_ids":$ids,"posted_at":$at,"status":"published"}]' \
+   --arg h "$JST_H" \
+   '.posted += [{"index":$i,"slot_hour":$h,"root_media_id":($ids[0]),"media_ids":$ids,"posted_at":$at,"status":"published"}]' \
    "$P" > "$P.tmp" && mv "$P.tmp" "$P"
 
 echo "ツリー ${#IDS[@]} 本を公開した（親: ${IDS[0]}）"

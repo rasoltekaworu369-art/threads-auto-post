@@ -21,6 +21,7 @@
 
 2. `reaction-log.csv` を読む。列は
    date,time,media_id,tree_pos,テーマ,構成型,開幕型,締め型,views,likes,replies,reposts,quotes,clicks
+   - `time` は **実際に投稿された時刻**（予定の枠ではない。GitHubの定時実行が25分前後遅れるため実測値を入れている）。時間帯の分析はこの列で行う
    - `time` が DAILY の行は、その日のアカウント単位の clicks 合計（投稿単位では取れない指標）
    - 🔴 **`tree_pos` が 0 の行が親投稿。型の優劣を判定するときは、この行だけを見る**（親の数字がリーチそのもの）
    - `tree_pos` が 1以降はセルフリプ。**「どこまで読まれたか」を見るために使う**

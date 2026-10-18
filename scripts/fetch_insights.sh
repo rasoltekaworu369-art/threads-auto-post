@@ -17,13 +17,17 @@ P="posted/${TARGET}.json"
 [ -f "$P" ] || { echo "対象日の記録が無い: ${P}"; exit 0; }
 Q="queue/${TARGET}.json"
 
-# 旧形式(media_id 単体)と新形式(media_ids 配列)の両方を扱う
+# 旧形式(media_id 単体)と新形式(media_ids 配列)の両方を扱う。
+# 🔴 time 列には「予定の枠」ではなく【実際に投稿した時刻】を入れる。
+#    GitHub の定時実行は25分前後遅れるため、予定の枠では時間帯分析が成立しない。
 jq -r '.posted[] | select(.status=="published")
        | .index as $i
+       | ((.posted_at // "") | split(" ") | (.[1] // "")) as $at
        | (.media_ids // [.media_id])
        | to_entries[]
-       | "\($i) \(.key) \(.value)"' "$P" |
-while read -r IDX POS MID; do
+       | "\($i) \(.key) \(.value) \($at)"' "$P" |
+while read -r IDX POS MID AT; do
+  ACTUAL="${AT%:*}"   # HH:MM:SS -> HH:MM
   M=$(curl -sS -G "${API}/${MID}/insights" -H "$AUTH" \
     --data-urlencode "metric=views,likes,replies,reposts,quotes")
   get() { printf '%s' "$M" | jq -r --arg n "$1" '(.data[]? | select(.name==$n) | (.values[0].value // .total_value.value)) // 0'; }
@@ -33,8 +37,9 @@ while read -r IDX POS MID; do
   IFS='|' read -r THEME KOU KAI SHIME SLOT <<< "$meta"
   # セルフリプの行には型を書かない（型は1ツリーに1つなので、親の行だけが持つ）
   if [ "$POS" -ne 0 ]; then THEME=""; KOU=""; KAI=""; SHIME=""; fi
+  [ -n "$ACTUAL" ] || ACTUAL="$SLOT"   # 旧記録には posted_at が無いので枠で代用
   printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,\n' \
-    "$TARGET" "$SLOT" "$MID" "$POS" "$THEME" "$KOU" "$KAI" "$SHIME" \
+    "$TARGET" "$ACTUAL" "$MID" "$POS" "$THEME" "$KOU" "$KAI" "$SHIME" \
     "$(get views)" "$(get likes)" "$(get replies)" "$(get reposts)" "$(get quotes)" \
     >> reaction-log.csv
 done

@@ -12,7 +12,7 @@
 | 担当 | 走る場所 | 時刻 | 仕事 |
 |---|---|---|---|
 | **Routine A** | Claude のクラウド | 毎日 23:07 | 翌日分9本を書いて `queue/` にコミット |
-| **GitHub Actions** | GitHub | 06:07〜22:07 の9回 | `queue/` から次の1本を Threads に公開 |
+| **GitHub Actions** | GitHub | 2時間おき9枠（各 **00〜30分のどこか**） | `queue/` から次のツリーを Threads に公開 |
 | **Routine C** | Claude のクラウド | 毎日 05:07 | `reaction-log.csv` を読んで `improve.md` を上書き |
 
 ループはこう閉じる：**`improve.md` → Routine A が生成 → Actions が投稿 → Actions が計測 → Routine C が判定 → `improve.md`**
