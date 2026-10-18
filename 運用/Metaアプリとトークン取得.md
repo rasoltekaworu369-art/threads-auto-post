@@ -86,9 +86,9 @@ App Secret はこの時点で一度だけコピーしてメモしておきます
 
 ---
 
-## STEP 2-B.5｜トークンの検証とユーザーIDの取得（App Secret不要）
+## ✅ STEP 2-B.5｜トークンの検証（2026-10-18 実測で確定）
 
-ターミナルに2行貼る。**これで「トークンが生きているか」と「THREADS_USER_ID」が同時に分かる。**
+生成ツールのトークンを `$tok` に入れて、2行で検証する。**App Secret は一切不要。**
 
 ```bash
 $tok = 'ここに生成されたトークン'
@@ -98,18 +98,60 @@ $tok = 'ここに生成されたトークン'
 curl.exe -s -G "https://graph.threads.com/v1.0/me" --data-urlencode "fields=id,username" -H "Authorization: Bearer $tok"
 ```
 
-`{"id":"...","username":"..."}` が返れば成功。**`id` が `THREADS_USER_ID` に入れる値**（秘密ではない）。
+`{"id":"...","username":"..."}` が返れば成功。**`id` が `THREADS_USER_ID`**（秘密ではない）。
 
-### 長期トークンかどうかを確かめる
-
-投稿の残量も見ておく（ついでに権限の確認になる）：
+### 🏆 確定した事実：生成ツールのトークンは最初から長期（60日）
 
 ```bash
-curl.exe -s -G "https://graph.threads.com/v1.0/me/threads_publishing_limit" --data-urlencode "fields=quota_usage,config" -H "Authorization: Bearer $tok"
+curl.exe -s -G "https://graph.threads.com/refresh_access_token" --data-urlencode "grant_type=th_refresh_token" --data-urlencode "access_token=$tok"
 ```
 
-**1時間後にもう一度 `me` が通れば長期トークン。** 弾かれたら短期だったので、
-下の「代替手順」の STEP 2-F（`th_exchange_token`）で60日のものに交換する。
+実測結果：`{"access_token":"TH...","token_type":"bearer","expires_in":5179484}`
+→ **5179484秒 ≒ 59.9日。** 生成ツールのトークンは**発行時点で長期トークン。**
+
+### 🔴 だから `th_exchange_token` は呼んではいけない
+
+`th_exchange_token` は**短期トークン専用の窓口。** 長期トークンを渡すと 452 で弾かれる：
+
+```json
+{"error":{"message":"Session key invalid...","code":452,"error_subcode":4279019,
+ "error_user_msg":"アクセストークンまたはアクセストークンの種類が無効です。"}}
+```
+
+📌 **「アクセストークンの**種類**が無効」という日本語が手がかり。** トークンが死んでいるのではなく、窓口が違う。
+📌 **この 452 を「トークンが無効になった」と読み違えて、原因を2回誤診した**（App Secret のリセットのせいだと断定し、撤回した）。
+
+### ✅ もう1つの確定：`refresh_access_token` は発行直後でも通った
+
+公式ドキュメントは「長期トークンの更新には発行から24時間以上の経過が必要」と書いている。
+**実測では、生成ツールで出した直後のトークンでも更新が成功した。**
+→ 📌 **週1のトークン更新ワークフロー（`.github/workflows/refresh-token.yml`）はそのまま使える。**
+
+---
+
+## 🔴 STEP 2-B.6｜長期トークンを露出させてしまった場合
+
+長期トークンは **App Secret より危険**。単体でそのアカウントに投稿・削除ができ、有効期間が60日ある。
+さらに**週1の更新ワークフローが動き続けると、その露出したトークンが永久に延命される。**
+
+### 無効化の方法は公式に明記されていない
+
+調べたが、Threads のユーザーアクセストークンを明示的に revoke する公式手順は見つからなかった。
+**だから「やって、効いたかを確かめる」形で進める。**
+
+1. **アプリダッシュボード → アプリのロール → ロール** で、該当アカウントの **Threads テスターを削除する**
+2. もう一度**テスターとして招待し、Threads 側で承諾する**
+3. **生成ツールで新しいトークンを発行する**（この値はどこにも貼らない）
+4. 🔴 **古いトークンが死んだことを必ず確認する：**
+
+```bash
+curl.exe -s -G "https://graph.threads.com/v1.0/me" --data-urlencode "fields=id,username" -H "Authorization: Bearer $tok"
+```
+
+`$tok` には**古い方**を入れて実行する。**452 が返れば無効化成功。** `id` が返ってきたら古いトークンはまだ生きているので、
+別の手（アプリ自体の作り直し）を検討する。
+
+5. 新しいトークンを GitHub Secrets に入れる
 
 ---
 
