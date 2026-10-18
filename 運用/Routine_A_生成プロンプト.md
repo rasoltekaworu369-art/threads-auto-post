@@ -2,7 +2,7 @@
 
 - **名前：** Threads 翌日分9本の生成
 - **スケジュール：** 毎日 23:07（JST）※ プリセットは daily で作り、必要なら CLI の `/schedule update` で cron を指定
-- **リポジトリ：** `threads-auto`
+- **リポジトリ：** `threads-auto-post`
 - **環境：** 既定（Default）のままで可。※ Routine A はネットに出ないため `graph.threads.net` の許可は不要
 - **コネクタ：** 全部外す（このルーティンは外部サービスを触らない）
 

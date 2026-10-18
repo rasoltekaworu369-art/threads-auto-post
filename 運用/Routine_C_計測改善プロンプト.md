@@ -2,7 +2,7 @@
 
 - **名前：** Threads 反応の判定と改善案
 - **スケジュール：** 毎日 05:07（JST）※ 数字は GitHub Actions が 04:07 に揃えてある
-- **リポジトリ：** `threads-auto`
+- **リポジトリ：** `threads-auto-post`
 - **環境：** 既定（Default）のままで可。※ 数字取得は Actions 側がやるので `graph.threads.net` の許可は不要
 - **コネクタ：** 全部外す
 
