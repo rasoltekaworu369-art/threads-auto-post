@@ -1,4 +1,4 @@
-# Routine C「計測・改善」— claude.ai/code/routines に貼るプロンプト
+﻿# Routine C「計測・改善」— claude.ai/code/routines に貼るプロンプト
 
 - **名前：** Threads 反応の判定と改善案
 - **スケジュール：** 毎日 05:07（JST）※ 数字は GitHub Actions が 04:07 に揃えてある

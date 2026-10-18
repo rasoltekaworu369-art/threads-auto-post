@@ -1,4 +1,4 @@
-# Routine A「生成」— claude.ai/code/routines に貼るプロンプト
+﻿# Routine A「生成」— claude.ai/code/routines に貼るプロンプト
 
 - **名前：** Threads 翌日分9本の生成
 - **スケジュール：** 毎日 23:07（JST）※ プリセットは daily で作り、必要なら CLI の `/schedule update` で cron を指定
