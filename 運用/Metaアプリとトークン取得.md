@@ -85,40 +85,41 @@ App Secret はこの時点で一度だけコピーしてメモしておきます
 
 ---
 
-## STEP 2-D｜認可URLを組み立ててブラウザで開く
+## STEP 2-D｜認可URLを開く（App ID 記入済み・2026-10-18）
+
+**Threads App ID = `1924249725220987`**（ボス提供・公開情報なのでこのファイルに記録してよい）
+
+リダイレクトURIは 2-B で登録したものに合わせて、下の**どちらか**を使う。
+🔴 **登録していない方を使うと `36008` で弾かれる。**
+
+### A. `https://localhost/` を登録した場合
 
 ```
-https://threads.com/oauth/authorize
-  ?client_id=<Threads App ID>
-  &redirect_uri=<2-B で登録したURL(一字も変えない)>
-  &scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies
-  &response_type=code
+https://threads.com/oauth/authorize?client_id=1924249725220987&redirect_uri=https%3A%2F%2Flocalhost%2F&scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies&response_type=code
 ```
 
-1行にするとこうです（`<>` の2つを差し替える）：
+### B. `https://rasoltekaworu369-art.github.io/` を登録した場合
 
 ```
-https://threads.com/oauth/authorize?client_id=<APP_ID>&redirect_uri=<REDIRECT_URI>&scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies&response_type=code
+https://threads.com/oauth/authorize?client_id=1924249725220987&redirect_uri=https%3A%2F%2Frasoltekaworu369-art.github.io%2F&scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies&response_type=code
 ```
 
-**scope の4つはこの仕組みに必要な権限です：**
+### 末尾スラッシュが無い形で登録した場合
 
-| スコープ | 何に使うか |
-|---|---|
-| `threads_basic` | 全呼び出しの前提。ユーザーID取得・トークン更新にも必要 |
-| `threads_content_publish` | 投稿（Routine A が作った9本を Actions が公開する） |
-| `threads_manage_insights` | 計測（views / likes / replies / clicks を取る） |
-| `threads_manage_replies` | 返信（今は使わないが、後で返信運用を足すときに再認可が要らなくなる） |
+`%2F` の最後の1つを消す。例:`https%3A%2F%2Flocalhost` （登録一覧の文字列と**一字も違わないこと**）
 
 ### 開いたあと
 
-- ブラウザで Threads の認可画面が出る → **許可する**
-- リダイレクト先に飛ぶ。ページは表示されなくてよい
-- **アドレスバーの `?code=` 以降をコピーする**
-- 🔴 **末尾に `#_` が付いていたら、それは削る**（コードの一部ではありません）
-- ⚠️ **コードは有効1時間・使い捨て。** 1回失敗したらこのSTEPからやり直しです
+1. Threads の認可画面が出る → **許可する**
+2. リダイレクト先に飛ぶ。**ページが「接続できません」や 404 でも問題ない**
+3. **アドレスバーの `?code=` 以降をコピーする**
+4. 🔴 **末尾に `#_` が付いていたら削る**（コードの一部ではない）
+5. ⚠️ **有効1時間・使い捨て。** 失敗したらこのSTEPからやり直し
 
----
+### ⚠️ ここで App ID の正否が分かる
+
+認可画面が正常に出れば、**App ID は正しい**（Threads用のもの）。
+「アプリの設定に問題があります」等のエラーが出たら、**ページ上部の「アプリID」を拾ってしまっている**ので 2-A に戻る。
 
 ## STEP 2-E｜認可コード → 短期トークン（1時間）
 
