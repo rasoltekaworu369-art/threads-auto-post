@@ -20,8 +20,11 @@
    このファイルに書かれた作法から外れない。
 
 2. `reaction-log.csv` を読む。列は
-   date,time,media_id,テーマ,構成型,開幕型,締め型,views,likes,replies,reposts,quotes,clicks
-   time が DAILY の行は、その日のアカウント単位の clicks 合計（投稿単位では取れない指標）。
+   date,time,media_id,tree_pos,テーマ,構成型,開幕型,締め型,views,likes,replies,reposts,quotes,clicks
+   - `time` が DAILY の行は、その日のアカウント単位の clicks 合計（投稿単位では取れない指標）
+   - 🔴 **`tree_pos` が 0 の行が親投稿。型の優劣を判定するときは、この行だけを見る**（親の数字がリーチそのもの）
+   - `tree_pos` が 1以降はセルフリプ。**「どこまで読まれたか」を見るために使う**
+     （親の views に対してセルフリプの views がどれだけ落ちるか＝離脱の位置。ここが改善の手がかりになる）
 
 3. 母数を先に数える。これを飛ばして型の優劣を書くことは禁止。
    - 投稿の累計本数
