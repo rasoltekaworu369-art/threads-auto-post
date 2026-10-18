@@ -55,23 +55,28 @@ App Secret はこの時点で一度だけコピーしてメモしておきます
 
 **ユースケース → Threads API → 設定** の「リダイレクトコールバックURL」に登録します。
 
-### 🔴 どのURLを使うか（ここが一番迷うところ）
+### ✅ 確定：`https://localhost/` で登録できた（2026-10-18 実測）
 
-認可コードは **登録したURLのクエリ文字列に乗って飛んでいきます。**
-つまり**他人のサイトのURLを登録すると、認可コードがその相手のサーバーに届きます。** 絶対に避けてください。
+このアプリでは **`https://localhost/`** がリダイレクトURIとして**受け付けられた。**
 
-**推奨の順番：**
+> ⚠️ Meta のサンプルリポジトリには「Threads アプリは localhost のリダイレクトURLに対応していない」と書かれているが、
+> **2026-10-18 時点のダッシュボードでは通った。** 公式サンプルの記述のほうが古いと見られる。
+> → 📌 **ドキュメントに「できない」と書かれていても、実際の画面で試す価値がある。**
 
-1. **まず `https://localhost/` を登録してみる**
-   - 通れば一番簡単。ブラウザは「接続できません」と表示しますが、**アドレスバーに認可コードが残る**のでそれをコピーします
-   - ⚠️ Meta のサンプルリポジトリには「Threads アプリは localhost のリダイレクトURLに対応していない」と書かれています。**ダッシュボードが弾いたら次へ**
-2. **弾かれたら、ボス自身の GitHub Pages を使う**
-   - `https://rasoltekaworu369-art.github.io/` を登録する（ボス自身のドメインなので、コードが他人に渡らない）
-   - ページが存在しなくても構いません。404 でもアドレスバーにコードは残ります
-3. ボスが持っているドメインがあれば、それでも可（HTTPS必須）
+ブラウザは「接続できません」と表示するが、**アドレスバーに認可コードが残る**のでそれをコピーする。
 
-🔴 **登録したURLは一字も変えずに使う。** 末尾のスラッシュの有無が違うだけで `36008` エラーで弾かれます。
-ダッシュボードが勝手に末尾スラッシュを足すことがあるので、**登録後の一覧に表示されている文字列をコピーして使ってください。**
+### 認可コードの扱いで絶対に外さない点
+
+認可コードは **登録したURLのクエリ文字列に乗って飛ぶ。**
+つまり**他人のサイトのURLを登録すると、認可コードがその相手のサーバーに届く。**
+`https://localhost/` はどこにも飛ばないので、この点で最も安全。
+
+### もし将来 localhost が弾かれるようになったら
+
+ボス自身の GitHub Pages `https://rasoltekaworu369-art.github.io/` を使う（自分のドメインなのでコードが他人に渡らない）。
+ページが存在せず 404 でも、アドレスバーにコードは残る。
+
+🔴 **登録したURLは一字も変えずに使う。** 末尾スラッシュの有無が違うだけで `36008` エラーになる。
 
 ---
 
@@ -85,48 +90,37 @@ App Secret はこの時点で一度だけコピーしてメモしておきます
 
 ---
 
-## STEP 2-D｜認可URLを開く（App ID 記入済み・2026-10-18）
+## STEP 2-D｜認可URLを開く（確定版・2026-10-18）
 
-**Threads App ID = `1924249725220987`**（ボス提供・公開情報なのでこのファイルに記録してよい）
+**Threads App ID = `1924249725220987`**（公開情報）
+**リダイレクトURI = `https://localhost/`**（登録済み・実測で確定）
 
-リダイレクトURIは 2-B で登録したものに合わせて、下の**どちらか**を使う。
-🔴 **登録していない方を使うと `36008` で弾かれる。**
-
-### A. `https://localhost/` を登録した場合
+この1本をブラウザで開く：
 
 ```
 https://threads.com/oauth/authorize?client_id=1924249725220987&redirect_uri=https%3A%2F%2Flocalhost%2F&scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies&response_type=code
 ```
 
-### B. `https://rasoltekaworu369-art.github.io/` を登録した場合
-
-```
-https://threads.com/oauth/authorize?client_id=1924249725220987&redirect_uri=https%3A%2F%2Frasoltekaworu369-art.github.io%2F&scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies&response_type=code
-```
-
-### 末尾スラッシュが無い形で登録した場合
-
-`%2F` の最後の1つを消す。例:`https%3A%2F%2Flocalhost` （登録一覧の文字列と**一字も違わないこと**）
-
 ### 開いたあと
 
 1. Threads の認可画面が出る → **許可する**
-2. リダイレクト先に飛ぶ。**ページが「接続できません」や 404 でも問題ない**
-3. **アドレスバーの `?code=` 以降をコピーする**
+2. `https://localhost/?code=...` に飛ぶ。**「接続できません」でも正常**
+3. **アドレスバーの `code=` の値をコピー**
 4. 🔴 **末尾に `#_` が付いていたら削る**（コードの一部ではない）
 5. ⚠️ **有効1時間・使い捨て。** 失敗したらこのSTEPからやり直し
 
-### ⚠️ ここで App ID の正否が分かる
+### ⚠️ ここで App ID の正否も分かる
 
-認可画面が正常に出れば、**App ID は正しい**（Threads用のもの）。
-「アプリの設定に問題があります」等のエラーが出たら、**ページ上部の「アプリID」を拾ってしまっている**ので 2-A に戻る。
+認可画面が正常に出れば **App ID は正しい**（Threads用のもの）。
+「アプリの設定に問題があります」系のエラーなら、ページ上部の「アプリID」を拾っているので 2-A に戻る。
 
 ## STEP 2-E｜認可コード → 短期トークン（1時間）
 
-**ボスのターミナルで実行してください。App Secret が入るので、私には渡さないでください。**
+**ボスのターミナルで実行する。App Secret が入るので私には渡さないこと。**
+`<APP_SECRET>` と `<CODE>` の2箇所だけ差し替える（App ID とリダイレクトURIは記入済み）。
 
 ```bash
-curl -s -X POST "https://graph.threads.com/oauth/access_token" -d "client_id=<APP_ID>" -d "client_secret=<APP_SECRET>" -d "grant_type=authorization_code" -d "redirect_uri=<REDIRECT_URI>" -d "code=<CODE>"
+curl -s "https://graph.threads.com/oauth/access_token" --data-urlencode "client_id=1924249725220987" --data-urlencode "client_secret=<APP_SECRET>" --data-urlencode "grant_type=authorization_code" --data-urlencode "redirect_uri=https://localhost/" --data-urlencode "code=<CODE>"
 ```
 
 返ってくる JSON：
@@ -135,19 +129,17 @@ curl -s -X POST "https://graph.threads.com/oauth/access_token" -d "client_id=<AP
 {"access_token":"TH...","token_type":"bearer","user_id":1234567890}
 ```
 
-- `access_token` → これが**短期トークン**。次のSTEPで1時間以内に使う
-- `user_id` → これが **Threads ユーザーID**。`THREADS_USER_ID` に入れる値（秘密ではない）
+- `access_token` → **短期トークン**。1時間以内に次のSTEPで交換する
+- `user_id` → **Threads ユーザーID**。`THREADS_USER_ID` に入れる値（秘密ではない）
 
 **うまくいかないとき：**
 
 | エラー | 原因 |
 |---|---|
-| `36008` / redirect_uri mismatch | 2-B で登録したURLと1文字でも違う。末尾スラッシュを確認 |
+| `36008` / redirect_uri mismatch | 登録URLと1文字でも違う。`https://localhost/` の末尾スラッシュを確認 |
 | code already used | コードは使い捨て。2-D からやり直す |
 | 400 / invalid code | 1時間を超えた。2-D からやり直す |
-| 権限が付いていない | 2-C の承諾を忘れている |
-
----
+| 権限が付いていない | 2-C のテスター承諾を忘れている |
 
 ## STEP 2-F｜短期トークン → 長期トークン（60日）
 
