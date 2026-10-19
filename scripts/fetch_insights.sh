@@ -32,6 +32,15 @@ while read -r IDX POS MID AT; do
   ACTUAL="${AT%:*}"   # HH:MM:SS -> HH:MM
   M=$(curl -sS -G "${API}/${MID}/insights" -H "$AUTH" \
     --data-urlencode "metric=views,likes,replies,reposts,quotes")
+  # 🔴 API が error を返したら「0」を書かずに即座に落ちる（2026-10-20 の事故）。
+  #    この検査が無かったため、Meta が "API access blocked." を返していた 04:35 の実行が
+  #    42行すべて views=0 の【偽のデータ】を書き込み、しかも success で終わった。
+  #    数字が無いことより、嘘の数字が残ることのほうが有害である。
+  if printf %s "$M" | jq -e ".error" >/dev/null 2>&1; then
+    echo "::error::insights の取得に失敗した（media ${MID}）。0 を書かずに中止する。" >&2
+    printf %s "$M" | head -c 400 >&2; echo >&2
+    exit 3
+  fi
   get() { printf '%s' "$M" | jq -r --arg n "$1" '(.data[]? | select(.name==$n) | (.values[0].value // .total_value.value)) // 0'; }
   if [ -f "$Q" ]; then
     meta=$(jq -r --argjson i "$IDX" '.posts[$i] | "\(.["テーマ"] // "")|\(.["構成型"] // "")|\(.["開幕型"] // "")|\(.["締め型"] // "")|\(.slot // "")"' "$Q")
@@ -49,6 +58,12 @@ done
 # clicks はアカウント単位でしか取れないため、日次の合計を別行で記録する
 U=$(curl -sS -G "${API}/${THREADS_USER_ID}/threads_insights" -H "$AUTH" \
   --data-urlencode "metric=clicks,followers_count")
+# 🔴 こちらも同じ。error なら clicks=0 / followers="" を書かずに落ちる
+if printf %s "$U" | jq -e ".error" >/dev/null 2>&1; then
+  echo "::error::アカウント単位の insights の取得に失敗した。DAILY 行を書かずに中止する。" >&2
+  printf %s "$U" | head -c 400 >&2; echo >&2
+  exit 3
+fi
 CLICKS=$(printf '%s' "$U" | jq -r '(.data[]? | select(.name=="clicks") | .total_value.value) // 0')
 FOLLOWERS=$(printf '%s' "$U" | jq -r '(.data[]? | select(.name=="followers_count") | .total_value.value) // ""')
 # 🔴 2026-10-19 以降、投稿にURLを貼らない方針に変更したため clicks は構造上0になる。
