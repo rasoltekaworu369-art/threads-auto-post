@@ -94,6 +94,26 @@ if [ "$(printf '%s' "$FIRST" | tr -d '[:space:]')" = "SKIP" ]; then
   exit 0
 fi
 
+# 🔴 URLの位置の門（2026-10-19 ボス指示）
+# ボスが手動運用しているアカウントで、投稿本体にnoteのリンクを付けたときに
+# シャドバン的な挙動が出た。URLを置いていいのは【ツリー最後のセルフリプ】だけ。
+# 親、または途中のセルフリプにURLがあったら、そのツリーは投稿せずに落とす。
+# （リスクのある投稿を出すより、1枠捨てるほうが安い）
+LAST_IDX=$(( ${#PARTS[@]} - 1 ))
+BAD_URL_AT=""
+for idx in "${!PARTS[@]}"; do
+  [ "$idx" -eq "$LAST_IDX" ] && continue
+  if printf '%s' "$(decode "${PARTS[$idx]}")" | grep -qiE 'https?://'; then
+    BAD_URL_AT="${BAD_URL_AT}${BAD_URL_AT:+,}${idx}"
+  fi
+done
+if [ -n "$BAD_URL_AT" ]; then
+  echo "🔴 URLの位置が違反（段 ${BAD_URL_AT}）。最後のセルフリプ以外にURLがあるため投稿しない。" >&2
+  jq --argjson i "$DONE" --arg h "$JST_H" --arg at "$BAD_URL_AT"     '.posted += [{"index":$i,"slot_hour":$h,"status":"blocked_url","違反の段":$at}]' "$P" > "$P.tmp" && mv "$P.tmp" "$P"
+  git add "$P" >/dev/null 2>&1 || true
+  exit 1
+fi
+
 # コンテナを作って公開する。
 # 公式は「作成から公開まで平均30秒待つ」ことを推奨。テキストのみなら通常は即座に通るので、
 # 短い待ちから始めて失敗したら伸ばす（固定で30秒待つより速く、かつ取りこぼさない）。
