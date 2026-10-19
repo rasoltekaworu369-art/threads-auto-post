@@ -94,21 +94,21 @@ if [ "$(printf '%s' "$FIRST" | tr -d '[:space:]')" = "SKIP" ]; then
   exit 0
 fi
 
-# 🔴 URLの位置の門（2026-10-19 ボス指示）
-# ボスが手動運用しているアカウントで、投稿本体にnoteのリンクを付けたときに
-# シャドバン的な挙動が出た。URLを置いていいのは【ツリー最後のセルフリプ】だけ。
-# 親、または途中のセルフリプにURLがあったら、そのツリーは投稿せずに落とす。
-# （リスクのある投稿を出すより、1枠捨てるほうが安い）
-LAST_IDX=$(( ${#PARTS[@]} - 1 ))
+# 🔴 URLの門（2026-10-19 ボス指示：全面禁止に変更）
+# 当初は「最後のセルフリプだけ許可」だったが、ボスの手動アカウントで
+# シャドバン的な挙動が出たため【どの段であってもURL禁止】に切り替えた。
+# 導線は「プロフィールの固定記事を見てください」の形（URLなし）で行う。
+# 1段でもURLがあれば、そのツリーは投稿せずに落とす。
+#   （リスクのある投稿を出すより、1枠捨てるほうが安い＝ボス裁定）
 BAD_URL_AT=""
 for idx in "${!PARTS[@]}"; do
-  [ "$idx" -eq "$LAST_IDX" ] && continue
   if printf '%s' "$(decode "${PARTS[$idx]}")" | grep -qiE 'https?://'; then
     BAD_URL_AT="${BAD_URL_AT}${BAD_URL_AT:+,}${idx}"
   fi
 done
 if [ -n "$BAD_URL_AT" ]; then
-  echo "🔴 URLの位置が違反（段 ${BAD_URL_AT}）。最後のセルフリプ以外にURLがあるため投稿しない。" >&2
+  echo "🔴 URL禁止違反（段 ${BAD_URL_AT}）。投稿にURLは一切入れられないため、このツリーは投稿しない。" >&2
+  echo "   導線は「プロフィールの固定記事を見てください」の形で書くこと（参照/Routine_Aの読む順序.md）。" >&2
   jq --argjson i "$DONE" --arg h "$JST_H" --arg at "$BAD_URL_AT"     '.posted += [{"index":$i,"slot_hour":$h,"status":"blocked_url","違反の段":$at}]' "$P" > "$P.tmp" && mv "$P.tmp" "$P"
   git add "$P" >/dev/null 2>&1 || true
   exit 1

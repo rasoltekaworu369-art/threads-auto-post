@@ -40,7 +40,7 @@ while read -r IDX POS MID AT; do
   # セルフリプの行には型を書かない（型は1ツリーに1つなので、親の行だけが持つ）
   if [ "$POS" -ne 0 ]; then THEME=""; KOU=""; KAI=""; SHIME=""; fi
   [ -n "$ACTUAL" ] || ACTUAL="$SLOT"   # 旧記録には posted_at が無いので枠で代用
-  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,\n' \
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,,\n' \
     "$TARGET" "$ACTUAL" "$MID" "$POS" "$THEME" "$KOU" "$KAI" "$SHIME" \
     "$(get views)" "$(get likes)" "$(get replies)" "$(get reposts)" "$(get quotes)" \
     >> reaction-log.csv
@@ -51,5 +51,8 @@ U=$(curl -sS -G "${API}/${THREADS_USER_ID}/threads_insights" -H "$AUTH" \
   --data-urlencode "metric=clicks,followers_count")
 CLICKS=$(printf '%s' "$U" | jq -r '(.data[]? | select(.name=="clicks") | .total_value.value) // 0')
 FOLLOWERS=$(printf '%s' "$U" | jq -r '(.data[]? | select(.name=="followers_count") | .total_value.value) // ""')
-printf '%s,DAILY,,,,,,,,,,,,%s\n' "$TARGET" "$CLICKS" >> reaction-log.csv
+# 🔴 2026-10-19 以降、投稿にURLを貼らない方針に変更したため clicks は構造上0になる。
+#    列は消さない（0が並ぶこと自体が方針どおりに動いている証拠になる）。
+#    代わりの主KPIは followers_count の日次の伸び（→ concept.md §6）。
+printf '%s,DAILY,,,,,,,,,,,,%s,%s\n' "$TARGET" "$CLICKS" "$FOLLOWERS" >> reaction-log.csv
 echo "追記完了: ${TARGET}（clicks合計=${CLICKS} / フォロワー=${FOLLOWERS}）"
