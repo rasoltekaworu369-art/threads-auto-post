@@ -38,3 +38,4 @@ desktop.ini
 # ---------------------------------------------------------------
 !scripts/refresh_token.sh
 !.github/workflows/refresh-token.yml
+__pycache__/
