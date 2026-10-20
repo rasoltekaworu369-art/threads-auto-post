@@ -12,7 +12,7 @@
    ⭕ 採る     : ボス実物から機序を説明している文を抜く
    ⭕ 機械処理 : note専用の装飾（「、、」絵文字 (笑)）を落とす
    ⭕ 印をつける: 「静」や憲章に反する箇所を flag で指摘する
-   ⭕ 倒す     : queue に出た言い換えを 使える→使用済み にする（--mark-used）
+   ⭕ 倒す・戻す: 直近3日の queue に出た行を 使用済み に、3日空いた行を 使える に戻す（--mark-used）
    🔴 やらない : 文を書き換える・新しい言い方を作る
                 → 「静」への変換は人（呪術者）がやる。この器は候補と指摘までで止まる。
                   変換後も出典列にボスの原文を必ず残す（翻訳か発明かを後から検証できる）。
@@ -182,10 +182,10 @@ def candidates(path):
         yield s
 
 
-def used_cores():
+def used_cores(files=None):
     """queue に既に出た文の核を集める（12字の塊で照合する）。"""
     cores = set()
-    for f in glob.glob("queue/*.json"):
+    for f in (glob.glob("queue/*.json") if files is None else files):
         d = json.load(io.open(f, encoding="utf-8"))
         for p in d.get("posts", []):
             b = "".join(p.get("tree") or [p.get("text", "")])
@@ -202,18 +202,26 @@ def existing_rows():
     return set(re.findall(r"\|\s*`([^`]+)`\s*\|", body)), body
 
 
-ROW = re.compile(r"^\| (H\d+) \| (.+?) \| 使える \|")
+ROW = re.compile(r"^\| (H\d+) \| (.+?) \| (使える|使用済み) \|")
+
+# 🔴 2026-10-21 ボス裁定:「重要なのは内容。言い回しは3日空けたら使っていい」
+#    → 直近3日の queue に出ていない行は「使える」に戻す。
+#    cross_day_scan.py も直近3日と比べるので、窓を揃えておけば戻した行で exit 1 にならない。
+#    中身（テーマ・切り口・オリジン）の被りは scripts/content_scan.py が別に見る。
+COOLDOWN_DAYS = 3
 
 
 def mark_used():
     """🔴 「使った」の記録を人の手に任せると必ず忘れる（手順書に書いても実行されない）。
-    queue に実際に出ているかで機械的に倒す。"""
+    直近3日の queue に実際に出ているかで、使用済み⇔使える を機械的に揃える。"""
     if not os.path.exists(OUT):
         print("在庫表が無い。先に採取すること")
         return 2
-    used = used_cores()
+    files = sorted(glob.glob("queue/*.json"), key=os.path.basename)[-COOLDOWN_DAYS:]
+    print("使用中とみなす窓: " + ", ".join(os.path.basename(f)[:10] for f in files))
+    used = used_cores(files)
     lines = io.open(OUT, encoding="utf-8").read().splitlines()
-    flipped = 0
+    to_used = to_free = 0
     for i, ln in enumerate(lines):
         m = ROW.match(ln)
         if not m:
@@ -221,14 +229,19 @@ def mark_used():
         form = m.group(2).strip()
         if len(form) < 12:
             continue
-        if any(form[x:x + 12] in used for x in range(len(form) - 11)):
+        hit = any(form[x:x + 12] in used for x in range(len(form) - 11))
+        if hit and m.group(3) == "使える":
             lines[i] = ln.replace("| 使える |", "| 使用済み |", 1)
-            flipped += 1
+            to_used += 1
             print("  使用済みに倒した: " + m.group(1) + " " + form[:30])
-    if flipped:
+        elif not hit and m.group(3) == "使用済み":
+            lines[i] = ln.replace("| 使用済み |", "| 使える |", 1)
+            to_free += 1
+            print("  3日空いたので戻した: " + m.group(1) + " " + form[:30])
+    if to_used or to_free:
         io.open(OUT, "w", encoding="utf-8", newline="\n").write(
             chr(10).join(lines) + chr(10))
-    print("使用済みに倒した行: " + str(flipped))
+    print("使用済みに倒した行: " + str(to_used) + " / 使えるに戻した行: " + str(to_free))
     return 0
 
 
@@ -241,7 +254,7 @@ HEADER = [
     "> **全件、ボスが書いた原稿が出典。** `my秘書/制作/` のAI下書きからは採っていない。",
     "",
     "> **状態** の意味: `要変換`=「静」に直してから使う / `使える`=そのまま使える /",
-    "> `使用済み`=直近で使った（しばらく使わない） / `不採用`=機序の言い換えではない",
+    "> `使用済み`=直近3日の queue に出ている（3日空くと自動で `使える` に戻る） / `不採用`=機序の言い換えではない",
     "",
     "---",
     "",
