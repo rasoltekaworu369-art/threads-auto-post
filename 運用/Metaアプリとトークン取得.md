@@ -207,7 +207,7 @@ curl.exe -s -G "https://graph.threads.com/v1.0/me" --data-urlencode "fields=id,u
 この1本をブラウザで開く：
 
 ```
-https://threads.com/oauth/authorize?client_id=1924249725220987&redirect_uri=https%3A%2F%2Flocalhost%2F&scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies&response_type=code
+https://threads.com/oauth/authorize?client_id=1924249725220987&redirect_uri=https%3A%2F%2Flocalhost%2F&scope=threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies,threads_read_replies&response_type=code
 ```
 
 ### 開いたあと

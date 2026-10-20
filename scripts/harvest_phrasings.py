@@ -151,6 +151,13 @@ def sources(src_root):
               "参照/お手本_Threads_スピ.md"]:
         if os.path.exists(f):
             found.append(f)
+    # 🔴 2026-10-21 追加: ボスが置いた原稿と、週末の音声メモの文字起こし。
+    #    ボス本人が置く場所なので名前の印は問わない。ジャンルだけは中身で判定する（恋愛・副業を落とす）
+    for f in sorted(glob.glob("参照/ボス原稿/*.md") + glob.glob("参照/ボス原稿/*.txt")):
+        if os.path.basename(f).startswith("README"):
+            continue
+        if is_spi(io.open(f, encoding="utf-8", errors="replace").read()):
+            found.append(f)
     return found
 
 
