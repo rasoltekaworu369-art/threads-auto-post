@@ -24,4 +24,4 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           gh issue comment "$NUM" --repo "$REPO" \
-            --body "@${OWNER} ルーティンから要確認の知らせです。上の本文を読んでください。対応が済んだら Issue を閉じてください。"
+            --body "@${OWNER} ルーティンから要確認の知らせです。上の本文を読んでください。"
