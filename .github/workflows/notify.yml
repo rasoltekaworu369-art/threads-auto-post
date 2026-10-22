@@ -1,0 +1,27 @@
+name: ボスへの通知（Issue にメンションを付ける）
+
+# Routine A / C は「ボスに知らせること」を Issue に書く（2026-10-22 ボス裁定）。
+# 🔴 Issue はボスのアカウント名義で立つので、GitHub は「自分の行動」とみなしてメールを送らない。
+#    そこで github-actions ボット（別の人）がメンション付きでコメントし、通知メールを発生させる。
+# ボットのコメントは別のワークフローを起動しないので、ループにはならない。
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  notify:
+    if: startsWith(github.event.issue.title, '【要確認】')
+    runs-on: ubuntu-latest
+    steps:
+      - name: ボスにメンションする
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUM: ${{ github.event.issue.number }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          gh issue comment "$NUM" --repo "$REPO" \
+            --body "@${OWNER} ルーティンから要確認の知らせです。上の本文を読んでください。対応が済んだら Issue を閉じてください。"
