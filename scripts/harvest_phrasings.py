@@ -36,7 +36,12 @@ try:
 except Exception:
     pass
 
-OUT = "参照/言い換え在庫_スピ.md"
+# 🔴 アカウントの解決（正本=参照/アカウント対応表.md / 対=scripts/acct_env.sh）
+#    ACCT を省略すると spi。そのとき PFX は空文字＝【従来と同じ置き場】になる。
+ACCT = os.environ.get("ACCT", "spi")
+PFX = "" if ACCT == "spi" else ACCT + "/"
+GENRE = "スピ" if ACCT == "spi" else "恋愛"
+OUT = "参照/言い換え在庫_%s.md" % GENRE
 
 # ── 出典として認めるもの ───────────────────────────────────────────
 # 🔴 ボスが書いた物だけ。my秘書/制作/ は呪術者が書いたAI下書きを含むので入れない。
@@ -46,18 +51,23 @@ BOSS_NAME = re.compile(r"ボス推敲|ボス下書き|ボス手書き|ボス加�
 # 🔴 ジャンルはファイル名で判定できない（2026-10-20 の失敗）。
 #    「40代50代から彼女を作った人が…」は恋愛だが名前に「恋愛」が無く、
 #    最初の版はこれを出典に通してしまった。→ 中身の語彙で判定する。
-SPI_W = re.compile(r"天秤|引き寄せ|重り|言霊|予祝|アファメ")
-OTH_W = re.compile(r"彼女|マチアプ|デート|プロンプト|ChatGPT|記事を書")
+#    2026-10-30: 恋愛アカウントを足したので、自ジャンル語と他ジャンル語を入れ替える。
+if ACCT == "spi":
+    OWN_W = re.compile(r"天秤|引き寄せ|重り|言霊|予祝|アファメ")
+    OTH_W = re.compile(r"彼女|マチアプ|デート|プロンプト|ChatGPT|記事を書")
+else:
+    OWN_W = re.compile(r"彼女|マチアプ|デート|モテ|女性|告白|片思い")
+    OTH_W = re.compile(r"天秤|引き寄せ|重り|言霊|予祝|アファメ|プロンプト|ChatGPT|記事を書")
 
 
-def is_spi(text):
-    """スピ語が1つ以上あり、かつ他ジャンル語より多いファイルだけを出典にする。
+def is_own_genre(text):
+    """自ジャンル語が1つ以上あり、かつ他ジャンル語より多いファイルだけを出典にする。
 
     実測(2026-10-20): 神の天秤=44対0 / スピお金コーパス=52対4 / 大丈夫=1対0 が通り、
     恋愛コーパス=0対101 / AI副業コーパス=1対25 が落ちる。
     """
-    spi = len(SPI_W.findall(text))
-    return spi >= 1 and spi > len(OTH_W.findall(text))
+    own = len(OWN_W.findall(text))
+    return own >= 1 and own > len(OTH_W.findall(text))
 
 
 # ── 機序を説明している文の判定 ─────────────────────────────────────
@@ -106,6 +116,14 @@ S15_FLAGS = [
 ]
 
 # です・ます以外で終わる文は常体（CLAUDE.md「全ジャンルです・ます調」違反）
+# 🔴 憲章S15/CLAUDE.md:「AI副業・恋愛=動 / スピ=静」。
+#    尻切れフック「、、」・(笑)・タメ口崩し・擬音・ランキングを禁じているのは【スピだけ】。
+#    恋愛でこれを弾くと在庫が不当に枯れるので、ジャンルを問わない2つだけ残す。
+#    （2026-10-30 晴明。文体の判断ではなく、憲章の適用範囲をそのまま写しただけ）
+if ACCT != "spi":
+    _KEEP = {"断定副詞", "権威の年数(S22)"}
+    S15_FLAGS = [(n, p) for n, p in S15_FLAGS if n in _KEEP]
+
 POLITE_END = re.compile(r"(です|ます|ません|ましょう|ください|でしょう|ですね|ますね|"
                         r"ですか|ますか|でした|ました|んです|のです)[。？！?!]?$")
 
@@ -144,19 +162,20 @@ def sources(src_root):
     for f in sorted(glob.glob(pattern)):
         if not BOSS_NAME.search(os.path.basename(f)):
             continue
-        if is_spi(io.open(f, encoding="utf-8", errors="replace").read()):
+        if is_own_genre(io.open(f, encoding="utf-8", errors="replace").read()):
             found.append(f)
     # リポジトリ内のボス実物の抽出版も出典に含める
-    for f in ["参照/お手本_無料部分_東洋式の引き寄せ.md",
-              "参照/お手本_Threads_スピ.md"]:
+    for f in (["参照/お手本_無料部分_東洋式の引き寄せ.md", "参照/お手本_Threads_スピ.md"]
+              if ACCT == "spi" else ["参照/お手本_Threads_恋愛.md"]):
         if os.path.exists(f):
             found.append(f)
     # 🔴 2026-10-21 追加: ボスが置いた原稿と、週末の音声メモの文字起こし。
     #    ボス本人が置く場所なので名前の印は問わない。ジャンルだけは中身で判定する（恋愛・副業を落とす）
-    for f in sorted(glob.glob("参照/ボス原稿/*.md") + glob.glob("参照/ボス原稿/*.txt")):
+    MANU = "参照/ボス原稿" if ACCT == "spi" else "参照/ボス原稿_恋愛"
+    for f in sorted(glob.glob(MANU + "/*.md") + glob.glob(MANU + "/*.txt")):
         if os.path.basename(f).startswith("README"):
             continue
-        if is_spi(io.open(f, encoding="utf-8", errors="replace").read()):
+        if is_own_genre(io.open(f, encoding="utf-8", errors="replace").read()):
             found.append(f)
     return found
 
@@ -185,7 +204,7 @@ def candidates(path):
 def used_cores(files=None):
     """queue に既に出た文の核を集める（12字の塊で照合する）。"""
     cores = set()
-    for f in (glob.glob("queue/*.json") if files is None else files):
+    for f in (glob.glob(PFX + "queue/*.json") if files is None else files):
         d = json.load(io.open(f, encoding="utf-8"))
         for p in d.get("posts", []):
             b = "".join(p.get("tree") or [p.get("text", "")])
@@ -217,7 +236,7 @@ def mark_used():
     if not os.path.exists(OUT):
         print("在庫表が無い。先に採取すること")
         return 2
-    files = sorted(glob.glob("queue/*.json"), key=os.path.basename)[-COOLDOWN_DAYS:]
+    files = sorted(glob.glob(PFX + "queue/*.json"), key=os.path.basename)[-COOLDOWN_DAYS:]
     print("使用中とみなす窓: " + ", ".join(os.path.basename(f)[:10] for f in files))
     used = used_cores(files)
     lines = io.open(OUT, encoding="utf-8").read().splitlines()

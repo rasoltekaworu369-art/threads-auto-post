@@ -16,19 +16,35 @@ permissions:
 jobs:
   insights:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1        # 🔴 直列。並列だと main への push がぶつかる
+      matrix:
+        include:
+          - acct: spi
+            uid: THREADS_USER_ID
+            tok: THREADS_ACCESS_TOKEN
+            dormant: ''              # スピは Secret が消えたら大声で落ちる
+          - acct: renai
+            uid: THREADS_USER_ID_RENAI
+            tok: THREADS_ACCESS_TOKEN_RENAI
+            dormant: '1'             # 🔴 未有効化のあいだは何もせず終わる
     steps:
       - uses: actions/checkout@v4
 
-      - name: insights を取得して reaction-log.csv に追記
+      - name: insights を取得して反応ログに追記（${{ matrix.acct }}）
         env:
-          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
-          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          ACCT: ${{ matrix.acct }}
+          ALLOW_DORMANT: ${{ matrix.dormant }}
+          THREADS_USER_ID: ${{ secrets[matrix.uid] }}
+          THREADS_ACCESS_TOKEN: ${{ secrets[matrix.tok] }}
         run: bash scripts/fetch_insights.sh "${{ inputs.date }}"
 
       - name: 反応ログをコミット
         run: |
           git config user.name  "threads-bot"
           git config user.email "threads-bot@users.noreply.github.com"
-          git add reaction-log.csv
-          git diff --staged --quiet || git commit -m "計測: $(TZ=Asia/Tokyo date +%F)"
-          git push
+          git add reaction-log.csv renai/reaction-log.csv
+          git diff --staged --quiet && exit 0
+          git commit -m "計測: ${{ matrix.acct }} $(TZ=Asia/Tokyo date +%F)"
+          git pull --rebase origin main && git push

@@ -37,13 +37,28 @@ concurrency:
 jobs:
   post:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1        # 🔴 直列。並列だと main への push がぶつかる
+      matrix:
+        include:
+          - acct: spi
+            uid: THREADS_USER_ID
+            tok: THREADS_ACCESS_TOKEN
+            dormant: ''              # スピは Secret が消えたら大声で落ちる
+          - acct: renai
+            uid: THREADS_USER_ID_RENAI
+            tok: THREADS_ACCESS_TOKEN_RENAI
+            dormant: '1'             # 🔴 未有効化のあいだは何もせず終わる
     steps:
       - uses: actions/checkout@v4
 
-      - name: 次の1本を投稿
+      - name: 次の1本を投稿（${{ matrix.acct }}）
         env:
-          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
-          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          ACCT: ${{ matrix.acct }}
+          ALLOW_DORMANT: ${{ matrix.dormant }}
+          THREADS_USER_ID: ${{ secrets[matrix.uid] }}
+          THREADS_ACCESS_TOKEN: ${{ secrets[matrix.tok] }}
           FORCE_POST: ${{ github.event_name == 'workflow_dispatch' && inputs.force && '1' || '' }}
         run: bash scripts/post_next.sh
 
@@ -51,6 +66,8 @@ jobs:
         run: |
           git config user.name  "threads-bot"
           git config user.email "threads-bot@users.noreply.github.com"
-          git add posted/
-          git diff --staged --quiet || git commit -m "記録: $(TZ=Asia/Tokyo date +'%F %H:%M') の投稿"
-          git push
+          git add posted/ renai/posted/
+          git diff --staged --quiet && exit 0
+          git commit -m "記録: ${{ matrix.acct }} $(TZ=Asia/Tokyo date +'%F %H:%M') の投稿"
+          # 他のアカウントの便と push がぶつかることがあるので、取り込んでから押す
+          git pull --rebase origin main && git push

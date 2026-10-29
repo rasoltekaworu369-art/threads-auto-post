@@ -11,7 +11,11 @@
 #
 # 新しいトークンは標準出力に出さない。
 set -euo pipefail
-: "${THREADS_ACCESS_TOKEN:?}"
+. "$(dirname "$0")/acct_env.sh"
+acct_require_token
+# 🔴 アカウントごとに別のトークン。書き戻す Secret の名前も別。
+SECRET_NAME="${TOKEN_SECRET_NAME:-THREADS_ACCESS_TOKEN}"
+echo "対象アカウント: ${ACCT}（${GENRE}）/ Secret: ${SECRET_NAME}"
 HOST="${THREADS_HOST:-graph.threads.com}"
 
 if [ -z "${GH_TOKEN:-}" ]; then
@@ -47,5 +51,5 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
-printf '%s' "$NEW" | gh secret set THREADS_ACCESS_TOKEN --repo "${GITHUB_REPOSITORY}"
+printf '%s' "$NEW" | gh secret set "$SECRET_NAME" --repo "${GITHUB_REPOSITORY}"
 echo "✅ GitHub Secret を更新した"

@@ -11,10 +11,26 @@ on:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1        # 🔴 直列。並列だと main への push がぶつかる
+      matrix:
+        include:
+          - acct: spi
+            uid: THREADS_USER_ID
+            tok: THREADS_ACCESS_TOKEN
+            dormant: ''              # スピは Secret が消えたら大声で落ちる
+          - acct: renai
+            uid: THREADS_USER_ID_RENAI
+            tok: THREADS_ACCESS_TOKEN_RENAI
+            dormant: '1'             # 🔴 未有効化のあいだは何もせず終わる
     steps:
       - uses: actions/checkout@v4
-      - name: 長期トークンを更新
+      - name: 長期トークンを更新（${{ matrix.acct }}）
         env:
-          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          ACCT: ${{ matrix.acct }}
+          ALLOW_DORMANT: ${{ matrix.dormant }}
+          THREADS_ACCESS_TOKEN: ${{ secrets[matrix.tok] }}
+          TOKEN_SECRET_NAME: ${{ matrix.tok }}
           GH_TOKEN: ${{ secrets.GH_PAT_FOR_SECRETS }}
         run: bash scripts/refresh_token.sh

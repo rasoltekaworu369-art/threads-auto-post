@@ -16,8 +16,10 @@
 #     ④ 同じ枠で二重投稿しないガードを持つ（3回発火するので必須）
 #   結果、投稿される分は GitHub 側のばらつきで毎回変わる＝狙いどおり機械的に見えなくなる。
 set -euo pipefail
-: "${THREADS_USER_ID:?THREADS_USER_ID が未設定}"
-: "${THREADS_ACCESS_TOKEN:?THREADS_ACCESS_TOKEN が未設定}"
+. "$(dirname "$0")/acct_env.sh"
+acct_require_token
+: "${THREADS_USER_ID:?THREADS_USER_ID が未設定（ACCT='${ACCT}'）}"
+echo "対象アカウント: ${ACCT}（${GENRE}）"
 
 # ----- 時刻の門 -----------------------------------------------------------
 JST_H="$(TZ=Asia/Tokyo date +%H)"
@@ -45,8 +47,9 @@ HOST="${THREADS_HOST:-graph.threads.com}"
 API="https://${HOST}/v1.0"
 AUTH="Authorization: Bearer ${THREADS_ACCESS_TOKEN}"
 TODAY="$(TZ=Asia/Tokyo date +%F)"
-Q="queue/${TODAY}.json"
-P="posted/${TODAY}.json"
+Q="${QUEUE_DIR}/${TODAY}.json"
+P="${POSTED_DIR}/${TODAY}.json"
+mkdir -p "$POSTED_DIR"
 
 if [ ! -f "$Q" ]; then
   echo "::warning::キューが無い: ${Q}（Routine A が前夜に作る）"
@@ -56,6 +59,12 @@ fi
 
 DONE=$(jq '.posted | length' "$P")
 TOTAL=$(jq '.posts | length' "$Q")
+# 🔴 本数の栓（2026-10-30）。ボスが本数を落としたいときは ${LIMIT_FILE} の数字を書き換えるだけ。
+LIMIT="$(acct_daily_limit)"
+if [ "$TOTAL" -gt "$LIMIT" ]; then
+  echo "本数の栓: キュー ${TOTAL} 本のうち ${LIMIT} 本までに絞る（${LIMIT_FILE}）"
+  TOTAL="$LIMIT"
+fi
 if [ "$DONE" -ge "$TOTAL" ]; then
   echo "本日分は投稿済み (${DONE}/${TOTAL})"
   exit 0

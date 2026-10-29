@@ -13,20 +13,35 @@ permissions:
 jobs:
   replies:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1        # 🔴 直列。並列だと main への push がぶつかる
+      matrix:
+        include:
+          - acct: spi
+            uid: THREADS_USER_ID
+            tok: THREADS_ACCESS_TOKEN
+            dormant: ''              # スピは Secret が消えたら大声で落ちる
+          - acct: renai
+            uid: THREADS_USER_ID_RENAI
+            tok: THREADS_ACCESS_TOKEN_RENAI
+            dormant: '1'             # 🔴 未有効化のあいだは何もせず終わる
     steps:
       - uses: actions/checkout@v4
 
-      - name: 直近7日の投稿についた返信を集める
+      - name: 直近7日の投稿についた返信を集める（${{ matrix.acct }}）
         env:
-          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          ACCT: ${{ matrix.acct }}
+          ALLOW_DORMANT: ${{ matrix.dormant }}
+          THREADS_ACCESS_TOKEN: ${{ secrets[matrix.tok] }}
         run: bash scripts/fetch_replies.sh
 
       - name: 読者の声をコミット
         run: |
           git config user.name  "threads-bot"
           git config user.email "threads-bot@users.noreply.github.com"
-          git add 参照/読者の声_返信.jsonl
+          git add 参照/読者の声_返信.jsonl 参照/読者の声_返信_恋愛.jsonl
           git diff --staged --quiet && exit 0
-          git commit -m "収集: $(TZ=Asia/Tokyo date +%F) 読者の返信"
+          git commit -m "収集: ${{ matrix.acct }} $(TZ=Asia/Tokyo date +%F) 読者の返信"
           # 投稿ワークフローと push がぶつかることがあるので、取り込んでから押す
           git pull --rebase origin main && git push

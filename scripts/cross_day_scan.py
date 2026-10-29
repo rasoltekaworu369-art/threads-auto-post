@@ -13,6 +13,12 @@
 #          引数を省くと queue/ の最新日を対象にする。比較は直近3日。
 # 戻り値:  0 = 被りなし / 1 = 被りあり（書き換えが必要）
 import sys, json, re, glob, os, collections
+# 🔴 アカウントの解決（正本=参照/アカウント対応表.md / 対=scripts/acct_env.sh）
+#    ACCT を省略すると spi。そのとき PFX は空文字＝【従来と同じ置き場】になる。
+ACCT = os.environ.get("ACCT", "spi")
+PFX = "" if ACCT == "spi" else ACCT + "/"
+GENRE = "スピ" if ACCT == "spi" else "恋愛"
+
 
 # 端末のコードページに関係なく UTF-8 で出す（Windowsのcp932で文字化けするため）
 try: sys.stdout.reconfigure(encoding="utf-8")
@@ -52,9 +58,9 @@ def merged_matches(new_body, old_body):
     return [new_body[a:b] for a, b in out]
 
 def main():
-    files = sorted(glob.glob("queue/*.json"), key=os.path.basename)
+    files = sorted(glob.glob(PFX + "queue/*.json"), key=os.path.basename)
     if not files:
-        print("queue/ にファイルが無い"); return 0
+        print(PFX + "queue/ にファイルが無い"); return 0
     target = sys.argv[1] if len(sys.argv) > 1 else files[-1]
     # 🔴 Windows の glob は "queue\2026-10-18.json" を返す。
     #    target が "queue/2026-10-20.json" だと生の文字列比較が壊れるので、

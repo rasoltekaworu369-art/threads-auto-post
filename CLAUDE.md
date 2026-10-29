@@ -1,5 +1,14 @@
 # threads-auto — Threads 1日9本の自動運用
 
+🔴 **2026-10-30 から2アカウントを回す。** 置き場の正本は **`参照/アカウント対応表.md`**。**最初にそれを読む。**
+
+| ACCT | ジャンル | Threads | 状態 |
+|---|---|---|---|
+| `spi`（既定） | スピ | @zin888z | ✅ 稼働中（2026-10-18から） |
+| `renai` | 恋愛 | @zin369358 | 🔴 **未有効化**（Secret登録まで何もせず終わる → `運用/恋愛アカウントの有効化手順.md`） |
+
+🔴 **`ACCT` を省略すると `spi`。そのとき置き場は従来とまったく同じ。**（既存の配線を壊さないための形）
+
 このリポジトリは **Threads への1日9本の自動投稿と、その反応からの改善ループ** だけを回すためのもの。
 ボスのローカル環境（`D:\【Rasolte】\Claude\`）の全資産は入っていない。**必要最低限だけを持ち込んでいる。**
 
@@ -9,11 +18,13 @@
 
 ## 0. 仕組みの全体像（3つが別々に動く）
 
-| 担当 | 走る場所 | 時刻 | 仕事 |
+| 担当 | 走る場所 | 時刻（スピ / 🆕恋愛） | 仕事 |
 |---|---|---|---|
-| **Routine A** | Claude のクラウド | 毎日 23:07 | 翌日分9本を書いて `queue/` にコミット |
-| **GitHub Actions** | GitHub | 2時間おき9枠（各 **00〜30分のどこか**） | `queue/` から次のツリーを Threads に公開 |
-| **Routine C** | Claude のクラウド | 毎日 05:07 | `reaction-log.csv` を読んで `improve.md` を上書き |
+| **Routine A** | Claude のクラウド | 毎日 **23:07 / 23:47** | 翌日分9本を書いて `queue/` にコミット |
+| **GitHub Actions** | GitHub | 2時間おき9枠（各 **00〜30分のどこか**） | `queue/` から次のツリーを Threads に公開。🔴 **1回の実行で spi → renai の順に直列**（`max-parallel: 1`） |
+| **Routine C** | Claude のクラウド | 毎日 **05:07 / 05:47** | `reaction-log.csv` を読んで `improve.md` を上書き |
+
+🔴 **Routine を同時刻にしない。** main への push がぶつかる。
 
 ループはこう閉じる：**`improve.md` → Routine A が生成 → Actions が投稿 → Actions が計測 → Routine C が判定 → `improve.md`**
 
@@ -44,12 +55,18 @@
 concept.md              売る商品と売れるコンセプト。🔑 自動化の精度はこのファイルの精度で決まる
 improve.md              Routine C が毎朝上書き / Routine A が毎晩読む。人間は書き込まない
 reaction-log.csv        反応の記録。追記のみ。これが唯一の履歴
+本数.txt                 🆕 1日の本数の栓。数字を書き換えるだけで増減できる（既定9）
 queue/YYYY-MM-DD.json   その日に投稿する9ツリー(posts[].tree = 親1文 + セルフリプ3〜5本)
 posted/YYYY-MM-DD.json  公開した media_id の記録(root_media_id と media_ids 配列)
-参照/                   ボスの資産の抽出版（下記）
-scripts/                post_next.sh / fetch_insights.sh / refresh_token.sh
-運用/                   Routine A と C に貼るプロンプト、セットアップ手順
-.github/workflows/      投稿・計測・トークン更新の定時実行
+renai/                  🆕 恋愛の可変データ（上と同じ構成 + 直近の型.md）
+参照/                   ボスの資産の抽出版（共通 + ジャンル別。下記）
+参照/アカウント対応表.md    🔴 置き場の正本。どのアカウントが何を読むか
+scripts/acct_env.sh     🔴 対応表の機械読み版。全スクリプトがこれを source する
+scripts/                post_next.sh / fetch_insights.sh / fetch_replies.sh / refresh_token.sh / *.py
+運用/                   Routine A と C に貼るプロンプト、セットアップ手順、恋愛の有効化手順
+.github/workflows/      投稿・計測・返信収集・トークン更新の定時実行（全部 matrix で2アカウント）
+
+🔴 **恋愛で使うファイルを探すときは、必ず `参照/アカウント対応表.md` で引く。推測で `renai/` を付けない。**
 ```
 
 `参照/` の中身：
@@ -94,6 +111,9 @@ scripts/                post_next.sh / fetch_insights.sh / refresh_token.sh
 - 導線は **9本中3本まで**（上限であってノルマではない）。残りは導線なしで読ませる
 - **CTA に価格を書かない。** 金額はリンク先で見てもらう
 - 権威の年数は、フィード短文では使わない
+- 🔴 **ジャンルで温度が違う（憲章S15）:スピ=「静」/ 恋愛=「動」。**
+  尻切れフック「、、」・二段フック・(笑)・タメ口崩し・擬音・ランキング・メタ実況は、**スピでは禁止、恋愛では使ってよい**（ボスの実物が使っている）。
+  **どちらでも変わらないもの:**です・ます調 / 一人称は「私」 / 親は1文で独立 / 断定副詞（必ず・絶対・誰でも）は使わない
 
 ---
 
@@ -103,11 +123,14 @@ scripts/                post_next.sh / fetch_insights.sh / refresh_token.sh
 
 | 使う場所 | 渡し方 |
 |---|---|
-| GitHub Actions | リポジトリの Secrets：`THREADS_USER_ID` / `THREADS_ACCESS_TOKEN` / `GH_PAT_FOR_SECRETS` |
+| GitHub Actions（スピ） | リポジトリの Secrets：`THREADS_USER_ID` / `THREADS_ACCESS_TOKEN` |
+| 🆕 GitHub Actions（恋愛） | `THREADS_USER_ID_RENAI` / `THREADS_ACCESS_TOKEN_RENAI` |
+| 共通 | `GH_PAT_FOR_SECRETS`（トークンの自動更新。無ければ生存確認だけ） |
 | Routine（Claude のクラウド） | 環境の **Network secrets**（`graph.threads.com` と `graph.threads.net` の両方に Bearer で注入。VM 内に鍵が残らない） |
 
 🔴 **Threads の長期トークンは60日で恒久的に失効する。** 更新しないまま60日経つと OAuth からやり直しになる。
-`.github/workflows/refresh-token.yml` が毎週日曜に更新する。**このワークフローを止めてはいけない。**
+`.github/workflows/refresh-token.yml` が毎週日曜に **アカウントごとに別のトークンを** 更新する。**このワークフローを止めてはいけない。**
+🔴 **アカウントが増えるほど60日の時計も増える。** 1本でも切れると、そのアカウントだけが静かに止まる。
 
 ---
 
@@ -119,3 +142,7 @@ scripts/                post_next.sh / fetch_insights.sh / refresh_token.sh
 - 価格・URL を推測で書く
 - `main` 以外にブランチを切る（この運用は main 直コミットで回す）
 - `improve.md` に2つ以上の変更案を並べる（交絡して何も分からなくなる）
+- 🔴 **恋愛の Routine A が `参照/型カタログ_Threads版.md` の禁止節を書き換える。**
+  恋愛の禁止節は `renai/直近の型.md`。**2つのアカウントが同じ節を上書きすると、互いの記録を消し合う**
+- 🔴 **スピのデータを `renai/` に、恋愛のデータをルート直下に書く**（混ざると分離した意味が無くなる）
+- 🔴 **恋愛で `参照/お手本_無料部分_東洋式の引き寄せ.md` を読む**（スピ商品の無料部分。恋愛には無関係）

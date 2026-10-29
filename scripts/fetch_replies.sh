@@ -12,16 +12,17 @@
 #
 # 🔴 読者の username は保存しない。返信の本文・日時・どの投稿への返信かだけを残す。
 set -euo pipefail
-: "${THREADS_ACCESS_TOKEN:?}"
+. "$(dirname "$0")/acct_env.sh"
+acct_require_token
 HOST="${THREADS_HOST:-graph.threads.com}"
 API="https://${HOST}/v1.0"
 AUTH="Authorization: Bearer ${THREADS_ACCESS_TOKEN}"
-OUT="参照/読者の声_返信.jsonl"
+OUT="$REPLIES"
 DAYS="${1:-7}"   # 返信は投稿から数日かけて付くので、直近7日分の親を毎回見直す
 touch "$OUT"
 
 for d in $(seq 0 "$DAYS"); do
-  P="posted/$(TZ=Asia/Tokyo date -d "-${d} day" +%F).json"
+  P="${POSTED_DIR}/$(TZ=Asia/Tokyo date -d "-${d} day" +%F).json"
   [ -f "$P" ] || continue
   jq -r '.posted[] | select(.status=="published") | (.root_media_id // .media_id)' "$P"
 done | sort -u |

@@ -28,7 +28,12 @@ DAYS_BACK = 7
 ORIGIN_DAYS = 3
 THEME_TH = 0.28     # 2026-10-18〜21 の実データで校正（下の注記）
 PARENT_TH = 0.30
-INV = "参照/言い換え在庫_スピ.md"
+# 🔴 アカウントの解決（正本=参照/アカウント対応表.md / 対=scripts/acct_env.sh）
+#    ACCT を省略すると spi。そのとき PFX は空文字＝【従来と同じ置き場】になる。
+ACCT = os.environ.get("ACCT", "spi")
+PFX = "" if ACCT == "spi" else ACCT + "/"
+GENRE = "スピ" if ACCT == "spi" else "恋愛"
+INV = "参照/言い換え在庫_%s.md" % GENRE
 # 校正(2026-10-21): 10/18〜10/21 の別の日どうしで、テーマ Jaccard の最大は 0.20、親投稿は 0.25
 #   （どれも「別の話」）。一方「受け取れない／ご馳走されると受け取れない」は 0.31、
 #   「銀行アプリを開く癖」の言い換えは 0.40。その間に線を引いた。
@@ -72,7 +77,7 @@ def load(path):
     return out
 
 def main():
-    files = sorted(glob.glob("queue/*.json"), key=os.path.basename)
+    files = sorted(glob.glob(PFX + "queue/*.json"), key=os.path.basename)
     if len(sys.argv) > 1 and sys.argv[1] == "--list":
         # 書く前に使う: 直近7日（最新の日を含む）に何の話をしたかだけ出す
         for f in files[-DAYS_BACK:]:
