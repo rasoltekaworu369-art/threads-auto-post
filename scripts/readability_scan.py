@@ -11,7 +11,7 @@
 # 見るもの
 #   親(tree[0]) : 改行なし / です・ます・か？で終わらない / 本文40字以内 / 読点2個まで
 #                 恋愛だけ、言い切りの後ろに「それが、」のような橋渡しの短い切れ端を許す(ボスの固定投稿の実物)
-#   セルフリプ  : 2〜4本 / 1段 60〜150字(改行を除く) / 1行40字以内 / 40字を超える段は必ず改行する
+#   セルフリプ  : 3〜5本(本数は変えない・ボス確認) / 1段 60〜150字(改行を除く) / 1行40字以内 / 40字を超える段は必ず改行する
 #
 # 使い方:  python3 scripts/readability_scan.py queue/2026-11-01.json
 #          ACCT=renai python3 scripts/readability_scan.py renai/queue/2026-11-01.json
@@ -24,7 +24,7 @@ except Exception: pass
 ACCT = os.environ.get("ACCT", "spi")
 PARENT_MAX = 40
 COMMA_MAX = 2
-REPLIES = (2, 4)
+REPLIES = (3, 5)
 BODY = (60, 150)
 LINE_MAX = 40
 POLITE = re.compile(r"(です|ます|ません|でした|ました|でしょう|ください|か[？?]?)[。！!]*$")
