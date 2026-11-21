@@ -21,24 +21,46 @@ acct_require_token
 : "${THREADS_USER_ID:?THREADS_USER_ID が未設定（ACCT='${ACCT}'）}"
 echo "対象アカウント: ${ACCT}（${GENRE}）"
 
-# ----- 時刻の門 -----------------------------------------------------------
+# ----- 時刻の門（2026-11-21 改訂：取りこぼしを後から埋める「追いつき方式」） --------
+# 旧方式は「各枠の 00〜30分 に起動した回だけが投稿できる」だった。
+# 【実測 11/13〜11/21】GitHub の定時実行は 36回/日 のうち 14〜20回 しか起動せず、
+#   11/18 以降は 4〜6回/日 まで落ちた。しかも遅れが 40〜60分ある回が多く（10時・16時は毎日 :37〜:59 着）、
+#   門の外に着地した回はすべて「見送り」になっていた → 1日1〜7本しか出ていなかった。
+# 新方式：
+#   ① 各枠の投稿予定時刻 = 枠の時 + 0〜30分（日付・枠・アカウントから決まる乱数。再起動しても同じ）
+#   ② 予定時刻を過ぎた枠の数 > 投稿済み本数 なら、次の1本を出す（遅れて起動しても取りこぼさない）
+#   ③ 直前の投稿から MIN_GAP_MIN 分（既定30分）空いていなければ待つ（追いつき時の連投を防ぐ）
+#   ④ 06:00 より前は投稿しない。日付が変わったら前日分は追わない
 JST_H="$(TZ=Asia/Tokyo date +%H)"
 JST_M="$(TZ=Asia/Tokyo date +%M)"
 SLOT_HOURS="06 08 10 12 14 16 18 20 22"
+MIN_GAP_MIN="${MIN_GAP_MIN:-30}"
+TODAY_EARLY="$(TZ=Asia/Tokyo date +%F)"
+
+slot_offset() {   # 枠ごとの 0〜30分 のずらし（決定的な乱数）
+  local h="$1"
+  echo $(( $(printf '%s' "${TODAY_EARLY}-${h}-${ACCT}" | cksum | cut -d' ' -f1) % 31 ))
+}
+
+NOW_MIN=$(( 10#$JST_H * 60 + 10#$JST_M ))
+DUE=0
+NEXT_AT=""
+for h in $SLOT_HOURS; do
+  at=$(( 10#$h * 60 + $(slot_offset "$h") ))
+  if [ "$NOW_MIN" -ge "$at" ]; then
+    DUE=$((DUE + 1))
+  elif [ -z "$NEXT_AT" ]; then
+    NEXT_AT="$(printf '%02d:%02d' $((at / 60)) $((at % 60)))"
+  fi
+done
 
 if [ -n "${FORCE_POST:-}" ]; then
-  echo "FORCE_POST が指定された（手動実行）。時刻の門と二重投稿ガードを飛ばす"
+  echo "FORCE_POST が指定された（手動実行）。時刻の門と間隔の門を飛ばす"
+elif [ "$DUE" -eq 0 ]; then
+  echo "まだ今日の最初の枠の予定時刻前（JST ${JST_H}:${JST_M}・次は ${NEXT_AT:-なし}）。何もしない"
+  exit 0
 else
-  case " $SLOT_HOURS " in
-    *" $JST_H "*) ;;
-    *) echo "投稿の時間帯ではない（JST ${JST_H}:${JST_M}）。何もしない"; exit 0 ;;
-  esac
-
-  if [ "$((10#$JST_M))" -gt 30 ]; then
-    echo "枠の30分を過ぎている（JST ${JST_H}:${JST_M}）。この枠は見送る"
-    exit 0
-  fi
-  echo "投稿できる時刻（JST ${JST_H}:${JST_M}・枠は ${JST_H}:00〜${JST_H}:30）"
+  echo "JST ${JST_H}:${JST_M} 時点で予定時刻を過ぎた枠: ${DUE}本（次の予定 ${NEXT_AT:-本日分なし}）"
 fi
 
 # 公式ドキュメントは graph.threads.com へ移行中。graph.threads.net も現時点では同じ応答を返す。
@@ -69,12 +91,20 @@ if [ "$DONE" -ge "$TOTAL" ]; then
   echo "本日分は投稿済み (${DONE}/${TOTAL})"
   exit 0
 fi
-
-# ----- 二重投稿ガード -----------------------------------------------------
-# 1枠で3回発火するので、この枠で既に投稿していたら何もしない。
-if [ -z "${FORCE_POST:-}" ] && jq -e --arg h "$JST_H" '.posted[] | select(.slot_hour == $h)' "$P" >/dev/null 2>&1; then
-  echo "この枠（JST ${JST_H}時台）は既に投稿済み。二重投稿を防ぐため何もしない"
+if [ -z "${FORCE_POST:-}" ] && [ "$DONE" -ge "$DUE" ]; then
+  echo "予定時刻を過ぎた枠はすべて投稿済み (${DONE}/${DUE})。次の予定 ${NEXT_AT:-なし}"
   exit 0
+fi
+
+# ----- 間隔の門（旧「同じ時台で二重投稿しない」ガードの置き換え） --------------
+# 追いつきのときに連投しないよう、直前の公開から MIN_GAP_MIN 分は空ける。
+LAST_AT="$(jq -r '[.posted[] | select(.posted_at != null) | .posted_at] | last // empty' "$P")"
+if [ -z "${FORCE_POST:-}" ] && [ -n "$LAST_AT" ]; then
+  GAP=$(( ( $(date +%s) - $(TZ=Asia/Tokyo date -d "$LAST_AT" +%s) ) / 60 ))
+  if [ "$GAP" -lt "$MIN_GAP_MIN" ]; then
+    echo "直前の投稿（${LAST_AT}）から ${GAP} 分。${MIN_GAP_MIN} 分空くまで待つ（遅れ ${DONE}/${DUE}）"
+    exit 0
+  fi
 fi
 
 # 残量確認。親投稿だけが 250本/24h を消費し、セルフリプは別枠（1,000件/24h）。

@@ -21,7 +21,7 @@
 | 担当 | 走る場所 | 時刻（スピ / 🆕恋愛） | 仕事 |
 |---|---|---|---|
 | **Routine A** | Claude のクラウド | 毎日 **23:07 / 23:47** | 翌日分9本を書いて `queue/` にコミット |
-| **GitHub Actions** | GitHub | 2時間おき9枠（各 **00〜30分のどこか**） | `queue/` から次のツリーを Threads に公開。🔴 **1回の実行で spi → renai の順に直列**（`max-parallel: 1`） |
+| **GitHub Actions** | GitHub | 2時間おき9枠（各 **00〜30分のどこか**） | `queue/` から次のツリーを Threads に公開。🔴 **常駐方式**（2026-11-21〜）：1回の起動で最長330分とどまり、2分おきに spi → renai を確認。遅れて起動しても取りこぼした枠は後から埋める（`scripts/post_loop.sh`） |
 | **Routine C** | Claude のクラウド | 毎日 **05:07 / 05:47** | `reaction-log.csv` を読んで `improve.md` を上書き |
 
 🔴 **Routine を同時刻にしない。** main への push がぶつかる。

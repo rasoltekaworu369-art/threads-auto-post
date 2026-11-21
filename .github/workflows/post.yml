@@ -1,34 +1,35 @@
 name: Threads 自動投稿
 
-# 🔴 時刻の設計（2026-10-19 変更。ボス指示「毎回07分なのが気になる。00〜30分のランダムに」）
+# 🔴 2026-11-21 改訂：「起動した瞬間に投稿する」→「常駐して予定時刻に投稿する」
 #
-# 【実測】GitHub の定時実行は +25〜26分 遅れる（13:07予定→13:33 / 11:07予定→11:31）。
-#        分を正確に指定することはできない。だから「遅れを織り込む」設計にした。
+# 【なぜ変えたか（実測）】
+#   旧設計は cron を36回/日 仕掛け、各枠の 00〜30分 に起動した回だけが投稿していた。
+#   ところが GitHub の定時実行は 11/13〜11/17 で 14〜20回/日、11/18 以降は 4〜6回/日 しか起動しなかった。
+#   遅れも 40〜60分 ある回が多く（10時・16時は 11/01 から一度も門の中に着地していない）、
+#   投稿数 = 「門の中に着地できた回の数」= 1〜7本/日 になっていた。スピも恋愛も同じ便なので両方同時に欠けた。
 #
-# 狙う枠（JST）: 06:00〜06:30 / 08 / 10 / 12 / 14 / 16 / 18 / 20 / 22（各 00〜30分）
-# cron は UTC。枠の前の時間に3回＋枠の中に1回、合計4回発火させる。
-#   → 遅れ 0〜30分 を足すと、だいたい枠の 00〜25分 に着地する
-#   → 前の時間の3回は遅れが大きい日用、枠の中の1回は遅れが小さい日用。どちらに転んでも拾える
-#   → スクリプト側が「00〜30分の外では投稿しない」「同じ枠で二重投稿しない」を保証する
-#
-# 投稿される分は GitHub 側のばらつきで毎回変わる。これが狙いどおりのランダム性になる。
+# 【新設計】
+#   ・1回の起動で最長330分とどまり、2分おきに spi → renai を確認する（scripts/post_loop.sh）
+#   ・各枠の投稿時刻は 枠の時 + 0〜30分（日付・枠・アカウントで決まる乱数。ボス指示の「ランダムな分」を維持）
+#   ・起動が遅れても、予定時刻を過ぎた枠は後から埋める（直前の投稿から30分は空ける）
+#   ・持ち時間が尽きたら自分の後継を起動する。cron は「朝に起こす」「途切れたら拾う」ための予備
 on:
   schedule:
-    # 枠の【前の時間】に3回（遅れが大きい日をここで拾う）
-    - cron: '35,45,55 20,22,0,2,4,6,8,10,12 * * *'
-    # 🔴 枠の【中】に1回（遅れがほぼゼロの日をここで拾う）
-    #    前の時間の3回は「遅れ25分前後」を前提にしているため、遅れ5分未満の日は
-    #    3回すべてが枠の手前に着地して、枠を丸ごと取りこぼす。この1回がその保険。
-    - cron: '5 21,23,1,3,5,7,9,11,13 * * *'
+    # 朝に起こす（04:47 / 05:17 / 05:47 JST）。どれか1回が起動すれば足りる
+    - cron: '47 19 * * *'
+    - cron: '17,47 20 * * *'
+    # 日中の予備（毎時17分 JST 06〜22時）。常駐中に起動した回は待機に回り、常駐が終わると引き継ぐ
+    - cron: '17 21,22,23,0,1,2,3,4,5,6,7,8,9,10,11,12,13 * * *'
   workflow_dispatch:
     inputs:
       force:
-        description: '時刻の門を無視して投稿する（テスト用）'
+        description: '1本だけ即時に投稿する（テスト用。時刻と間隔の門を無視）'
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write
+  actions: write          # 後継の常駐を workflow_dispatch で起動するため
 
 concurrency:
   group: threads-post
@@ -37,37 +38,30 @@ concurrency:
 jobs:
   post:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      max-parallel: 1        # 🔴 直列。並列だと main への push がぶつかる
-      matrix:
-        include:
-          - acct: spi
-            uid: THREADS_USER_ID
-            tok: THREADS_ACCESS_TOKEN
-            dormant: ''              # スピは Secret が消えたら大声で落ちる
-          - acct: renai
-            uid: THREADS_USER_ID_RENAI
-            tok: THREADS_ACCESS_TOKEN_RENAI
-            dormant: '1'             # 🔴 未有効化のあいだは何もせず終わる
+    timeout-minutes: 350
+    env:
+      THREADS_USER_ID_SPI: ${{ secrets.THREADS_USER_ID }}
+      THREADS_ACCESS_TOKEN_SPI: ${{ secrets.THREADS_ACCESS_TOKEN }}
+      THREADS_USER_ID_RENAI: ${{ secrets.THREADS_USER_ID_RENAI }}
+      THREADS_ACCESS_TOKEN_RENAI: ${{ secrets.THREADS_ACCESS_TOKEN_RENAI }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: 次の1本を投稿（${{ matrix.acct }}）
-        env:
-          ACCT: ${{ matrix.acct }}
-          ALLOW_DORMANT: ${{ matrix.dormant }}
-          THREADS_USER_ID: ${{ secrets[matrix.uid] }}
-          THREADS_ACCESS_TOKEN: ${{ secrets[matrix.tok] }}
-          FORCE_POST: ${{ github.event_name == 'workflow_dispatch' && inputs.force && '1' || '' }}
-        run: bash scripts/post_next.sh
-
-      - name: 投稿記録をコミット
+      - name: 1本だけ即時投稿（手動テスト）
+        if: github.event_name == 'workflow_dispatch' && inputs.force
         run: |
           git config user.name  "threads-bot"
           git config user.email "threads-bot@users.noreply.github.com"
+          for a in spi renai; do
+            if [ "$a" = spi ]; then U="$THREADS_USER_ID_SPI"; T="$THREADS_ACCESS_TOKEN_SPI"; D=""; else U="$THREADS_USER_ID_RENAI"; T="$THREADS_ACCESS_TOKEN_RENAI"; D=1; fi
+            ACCT=$a ALLOW_DORMANT=$D THREADS_USER_ID="$U" THREADS_ACCESS_TOKEN="$T" FORCE_POST=1 bash scripts/post_next.sh || true
+          done
           git add posted/ renai/posted/
           git diff --staged --quiet && exit 0
-          git commit -m "記録: ${{ matrix.acct }} $(TZ=Asia/Tokyo date +'%F %H:%M') の投稿"
-          # 他のアカウントの便と push がぶつかることがあるので、取り込んでから押す
+          git commit -m "記録: 手動 $(TZ=Asia/Tokyo date +'%F %H:%M') の投稿"
           git pull --rebase origin main && git push
+
+      - name: 常駐して予定時刻に投稿（spi → renai）
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.force) }}
+        run: bash scripts/post_loop.sh
