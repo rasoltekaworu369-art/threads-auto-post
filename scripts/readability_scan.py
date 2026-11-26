@@ -22,7 +22,8 @@ try: sys.stdout.reconfigure(encoding="utf-8")
 except Exception: pass
 
 ACCT = os.environ.get("ACCT", "spi")
-PARENT_MAX = 40
+# 🆕 2026-11-26 ボス承認：スピの親は60字まで（10月後半の伸びた親は40〜60字だった）。恋愛は40字のまま
+PARENT_MAX = 60 if ACCT == "spi" else 40
 COMMA_MAX = 2
 REPLIES = (3, 5)
 BODY = (60, 150)
