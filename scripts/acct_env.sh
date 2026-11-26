@@ -25,6 +25,7 @@ case "$ACCT" in
     MANU_DIR="参照/ボス原稿"
     REPLIES="参照/読者の声_返信.jsonl"
     RECENT="参照/型カタログ_Threads版.md"   # スピは禁止節をカタログ末尾に置いている（既存のまま）
+    DEFAULT_TOPIC="スピリチュアル"          # 🆕 2026-11-26 親投稿に付けるトピックタグ（queue の topic_tag が無いとき）
     ;;
   renai)
     PFX="renai/"
@@ -35,6 +36,7 @@ case "$ACCT" in
     MANU_DIR="参照/ボス原稿_恋愛"
     REPLIES="参照/読者の声_返信_恋愛.jsonl"
     RECENT="renai/直近の型.md"
+    DEFAULT_TOPIC="恋愛"
     ;;
   *)
     echo "::error::未知のアカウント: ${ACCT}（参照/アカウント対応表.md を見ること）" >&2

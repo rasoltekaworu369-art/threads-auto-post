@@ -28,6 +28,24 @@ REPLIES = (3, 5)
 BODY = (60, 150)
 LINE_MAX = 40
 POLITE = re.compile(r"(です|ます|ません|でした|ました|でしょう|ください|か[？?]?)[。！!]*$")
+POLITE_DECL = re.compile(r"(です|ます|ません|でした|ました|でしょう)[。！!]*$")
+
+def _parent_origin():
+    """オリジン在庫_スピ.md の「🅿️ 親投稿にそのまま使える断片」表の1文を集める"""
+    out, on = set(), False
+    try:
+        for ln in open("参照/オリジン在庫_スピ.md", encoding="utf-8"):
+            if ln.startswith("## "):
+                on = "親投稿" in ln and "そのまま" in ln
+            elif on and ln.startswith("| ") and not ln.startswith("| #"):
+                c = [x.strip() for x in ln.strip().strip("|").split("|")]
+                if len(c) >= 3 and c[1] and not c[1].startswith("-"):
+                    out.add(c[1].rstrip("。"))
+    except OSError:
+        pass
+    return out
+
+PARENT_ORIGIN = _parent_origin()
 BRIDGE = re.compile(r"^(.*。)([^。]{1,10}[、,]+)$")   # 「〜考えられない。それが、」
 
 def main():
@@ -46,7 +64,13 @@ def main():
         elif m:
             bad.append((s, "親", "橋渡しの切れ端「%s」はスピでは使わない(静・S15)" % m.group(2)))
             head = m.group(1)
-        if POLITE.search(head):
+        if ACCT == "spi":
+            # 🆕 2026-11-26 ボス指示「スピはとりあえず『です・ます調』に戻して」
+            #   親は です・ます の言い切りで終える（問いの「か」で終えない）。
+            #   例外：🅿️ 親にそのまま使える断片（在庫の形のまま。ボスの言葉を語尾で変えない）
+            if head.rstrip("。") not in PARENT_ORIGIN and not POLITE_DECL.search(head):
+                bad.append((s, "親", "スピの親は です・ます調の言い切りで終える（2026-11-26 ボス指示）"))
+        elif POLITE.search(head):
             bad.append((s, "親", "です・ます/問いで終わっている → 言い切りにする"))
         if len(head) > PARENT_MAX:
             bad.append((s, "親", "%d字 > %d字。短く切る" % (len(head), PARENT_MAX)))

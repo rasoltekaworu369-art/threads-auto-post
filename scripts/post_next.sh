@@ -124,6 +124,14 @@ fi
 
 decode() { printf '%s' "$1" | base64 -d; }
 
+# 🆕 2026-11-26 トピックタグ（Threads API の topic_tag。1投稿1つ・1〜50字・「.」「&」不可）
+#   Meta 公式「タグ付きの投稿は一般により多く表示される」(2025-03)。フォロワーがほぼ0の今、
+#   フォロワー外に届く入口がほぼこれしか無い。親投稿にだけ付ける（セルフリプには付けない）。
+#   queue の posts[i].topic_tag があればそれ、無ければアカウントの既定（acct_env.sh の DEFAULT_TOPIC）。
+TOPIC="$(jq -r --argjson i "$DONE" '.posts[$i].topic_tag // empty' "$Q")"
+TOPIC="${TOPIC:-${DEFAULT_TOPIC:-}}"
+TOPIC="$(printf '%s' "$TOPIC" | tr -d '.&#' | cut -c1-50)"
+
 # ボスが朝のゲートで消した本は、親を SKIP に書き換えればツリーごと飛ばす
 FIRST="$(decode "${PARTS[0]}")"
 if [ "$(printf '%s' "$FIRST" | tr -d '[:space:]')" = "SKIP" ]; then
@@ -166,9 +174,23 @@ publish_one() {
       --data-urlencode "text=${text}" \
       --data-urlencode "reply_to_id=${parent}")
   else
-    create=$(curl -sS -X POST "${API}/${THREADS_USER_ID}/threads" -H "$AUTH" \
-      --data-urlencode "media_type=TEXT" \
-      --data-urlencode "text=${text}")
+    if [ -n "${TOPIC:-}" ]; then
+      create=$(curl -sS -X POST "${API}/${THREADS_USER_ID}/threads" -H "$AUTH" \
+        --data-urlencode "media_type=TEXT" \
+        --data-urlencode "text=${text}" \
+        --data-urlencode "topic_tag=${TOPIC}")
+      # タグが原因で弾かれても枠を失わないよう、タグ無しで1回だけ作り直す
+      if [ -z "$(printf '%s' "$create" | jq -r '.id // empty')" ]; then
+        echo "::warning::topic_tag「${TOPIC}」付きの作成に失敗。タグ無しで作り直す: ${create}" >&2
+        create=$(curl -sS -X POST "${API}/${THREADS_USER_ID}/threads" -H "$AUTH" \
+          --data-urlencode "media_type=TEXT" \
+          --data-urlencode "text=${text}")
+      fi
+    else
+      create=$(curl -sS -X POST "${API}/${THREADS_USER_ID}/threads" -H "$AUTH" \
+        --data-urlencode "media_type=TEXT" \
+        --data-urlencode "text=${text}")
+    fi
   fi
   cid=$(printf '%s' "$create" | jq -r '.id // empty')
   if [ -z "$cid" ]; then
@@ -216,8 +238,8 @@ IDS_JSON=$(printf '%s\n' "${IDS[@]}" | jq -R . | jq -cs .)
 jq --argjson i "$DONE" \
    --argjson ids "$IDS_JSON" \
    --arg at "$(TZ=Asia/Tokyo date +'%F %T')" \
-   --arg h "$JST_H" \
-   '.posted += [{"index":$i,"slot_hour":$h,"root_media_id":($ids[0]),"media_ids":$ids,"posted_at":$at,"status":"published"}]' \
+   --arg h "$JST_H" --arg tp "${TOPIC:-}" \
+   '.posted += [{"index":$i,"slot_hour":$h,"root_media_id":($ids[0]),"media_ids":$ids,"posted_at":$at,"status":"published","topic_tag":$tp}]' \
    "$P" > "$P.tmp" && mv "$P.tmp" "$P"
 
 echo "ツリー ${#IDS[@]} 本を公開した（親: ${IDS[0]}）"
